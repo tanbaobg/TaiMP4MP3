@@ -123,6 +123,46 @@ def download_apk():
         status_code=302
     )
 
+@app.get("/api/debug_tiktok")
+async def debug_tiktok(url: str = "https://www.tiktok.com/@nv_ptq/photo/7278291118968556807"):
+    import traceback
+    result = {"url": url}
+    try:
+        api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(url)}"
+        req = urllib.request.Request(
+            api_url,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                ),
+                "Accept": "application/json",
+            }
+        )
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        result["tikwm_code"] = data.get("code")
+        result["tikwm_msg"] = data.get("msg")
+        result["has_data"] = bool(data.get("data"))
+        if data.get("data"):
+            result["data_keys"] = list(data.get("data").keys())
+    except Exception as e:
+        result["error"] = str(e)
+        result["traceback"] = traceback.format_exc()
+    
+    try:
+        media_info = extract_tiktok_direct(url, base_api_url="https://taimp4mp3.vercel.app")
+        result["extract_tiktok_direct_success"] = media_info is not None
+        if media_info:
+            result["formats_count"] = len(media_info.formats)
+            result["formats"] = [f.id for f in media_info.formats]
+    except Exception as e:
+        result["extract_error"] = str(e)
+        result["extract_traceback"] = traceback.format_exc()
+
+    return result
+
 # --- API ROUTES ---
 @app.get("/api")
 def api_status():
