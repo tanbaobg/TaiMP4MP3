@@ -558,7 +558,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (streamTarget) {
       currentDirectStreamUrl = streamTarget.direct_url || streamTarget.proxy_url;
-      inlineVideoPlayer.src = currentDirectStreamUrl;
+      // Dùng proxy stream qua /api/stream để hỗ trợ Range seeking và Referer chuẩn, tránh bị CDN TikTok/Facebook chặn hotlinking
+      const streamUrl = `${currentApiBase.replace(/\/$/, '')}/api/stream?url=${encodeURIComponent(currentDirectStreamUrl)}`;
+      inlineVideoPlayer.src = streamUrl;
       inlineVideoPlayer.load();
 
       const dur = data.duration_seconds || 30;
@@ -853,7 +855,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const firstVideo = currentMediaData.formats.find((f) => f.type === 'video' && (f.direct_url || f.proxy_url));
     if (firstVideo) {
       previewTitle.textContent = currentMediaData.title;
-      previewPlayer.src = firstVideo.direct_url || firstVideo.proxy_url;
+      const targetUrl = firstVideo.direct_url || firstVideo.proxy_url;
+      previewPlayer.src = `${currentApiBase.replace(/\/$/, '')}/api/stream?url=${encodeURIComponent(targetUrl)}`;
       modalPreview.classList.remove('hidden');
       previewPlayer.play().catch(() => {});
     } else {

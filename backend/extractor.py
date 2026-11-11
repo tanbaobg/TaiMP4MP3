@@ -83,6 +83,25 @@ def clean_title(title: str) -> str:
 def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInfo]:
     """Bóc tách link video và nhạc TikTok không logo tốc độ cao qua TikWM API."""
     try:
+        # Xử lý tự động rút gọn link vt.tiktok.com hoặc vm.tiktok.com
+        if any(k in url.lower() for k in ["vt.tiktok", "vm.tiktok", "/t/"]):
+            try:
+                head_req = urllib.request.Request(
+                    url,
+                    headers={
+                        "User-Agent": (
+                            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) "
+                            "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1"
+                        ),
+                    }
+                )
+                with urllib.request.urlopen(head_req, timeout=5) as head_resp:
+                    resolved = head_resp.geturl()
+                    if "tiktok.com" in resolved and "/video/" in resolved:
+                        url = resolved.split("?")[0]
+            except Exception:
+                pass
+
         api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(url)}"
         req = urllib.request.Request(
             api_url,
@@ -111,16 +130,12 @@ def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInf
             if play_url.startswith("/"):
                 play_url = f"https://www.tikwm.com{play_url}"
 
-            hd_play_url = d.get("hdplay") or ""
-            if hd_play_url.startswith("/"):
-                hd_play_url = f"https://www.tikwm.com{hd_play_url}"
-
             music_url = d.get("music") or ""
             if music_url.startswith("/"):
                 music_url = f"https://www.tikwm.com{music_url}"
 
             formats: List[FormatOption] = []
-            # 1. Định dạng chuẩn H.264 không logo (Bắt buộc đứng đầu để trình xem trước và nút tải mặc định có 100% hình & tiếng)
+            # 1. Định dạng chuẩn H.264 không logo (Tương thích 100% hình & tiếng trên mọi trình duyệt & thiết bị)
             if play_url:
                 formats.append(
                     FormatOption(
@@ -147,22 +162,6 @@ def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInf
                         filesize_str="320 kbps",
                         direct_url=music_url,
                         proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(music_url)}&title={urllib.parse.quote(safe_title)}&ext=mp3",
-                        has_audio=True,
-                        watermark=False,
-                    )
-                )
-
-            # 3. Định dạng Full HD (nếu có, đặt sau bản H.264 chuẩn)
-            if hd_play_url:
-                formats.append(
-                    FormatOption(
-                        id="tiktok-hd-nowm",
-                        quality="MP4 Full HD Không Logo (1080p)",
-                        type="video",
-                        ext="mp4",
-                        filesize_str="Full HD Siêu Nét",
-                        direct_url=hd_play_url,
-                        proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(hd_play_url)}&title={urllib.parse.quote(safe_title)}&ext=mp4",
                         has_audio=True,
                         watermark=False,
                     )
@@ -199,7 +198,6 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
         "no_warnings": True,
         "skip_download": True,
         "extract_flat": False,
-        "format": "best[vcodec!=none][acodec!=none]/best",
         "socket_timeout": 15,
         "http_headers": {
             "User-Agent": (
@@ -215,7 +213,6 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
         ydl_opts["http_headers"]["Referer"] = "https://www.facebook.com/"
     elif platform == "tiktok":
         ydl_opts["http_headers"]["Referer"] = "https://www.tiktok.com/"
-        ydl_opts["format"] = "best[vcodec^=avc1][acodec!=none]/best[vcodec^=h264][acodec!=none]/best[acodec!=none][vcodec!=none]/best"
     elif platform == "youtube":
         ydl_opts["extractor_args"] = {
             "youtube": {
@@ -223,7 +220,6 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
                 "player_skip": ["webpage", "configs"],
             }
         }
-        ydl_opts["format"] = "best[vcodec!=none][acodec!=none]/best"
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
@@ -232,7 +228,7 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
             if platform == "youtube":
                 ydl_opts["extractor_args"] = {
                     "youtube": {
-                        "player_client": ["android_vr", "android"],
+                        "player_client": ["ios", "android"],
                         "player_skip": ["webpage", "configs"],
                     }
                 }

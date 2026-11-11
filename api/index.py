@@ -225,6 +225,62 @@ async def download_proxy(
         await client.aclose()
         raise HTTPException(status_code=502, detail=f"Lỗi khi tải stream: {str(e)}")
 
+@app.get("/stream")
+@app.get("/api/stream")
+async def stream_proxy(
+    request: Request,
+    url: str = Query(..., description="Đường dẫn file media trực tiếp để phát trong player"),
+):
+    """Proxy video trực tiếp vào thẻ <video> của trình duyệt với Range Header và Referer chuẩn."""
+    decoded_url = urllib.parse.unquote(url)
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+    }
+
+    if any(k in decoded_url for k in ["tiktok", "byteoversea", "ibytedtos", "tikwm", "musical.ly"]):
+        headers["Referer"] = "https://www.tiktok.com/"
+    elif any(k in decoded_url for k in ["facebook", "fbcdn", "fbsbx"]):
+        headers["Referer"] = "https://www.facebook.com/"
+
+    range_header = request.headers.get("range")
+    if range_header:
+        headers["Range"] = range_header
+
+    client = httpx.AsyncClient(timeout=45.0, follow_redirects=True)
+    try:
+        req = client.build_request("GET", decoded_url, headers=headers)
+        res = await client.send(req, stream=True)
+
+        async def stream_gen():
+            try:
+                async for chunk in res.aiter_bytes(chunk_size=1024 * 64):
+                    yield chunk
+            finally:
+                await res.aclose()
+                await client.aclose()
+
+        resp_headers = {
+            "Accept-Ranges": "bytes",
+            "Content-Type": res.headers.get("Content-Type", "video/mp4"),
+        }
+        if "Content-Range" in res.headers:
+            resp_headers["Content-Range"] = res.headers["Content-Range"]
+        if "Content-Length" in res.headers:
+            resp_headers["Content-Length"] = res.headers["Content-Length"]
+
+        return StreamingResponse(
+            stream_gen(),
+            status_code=res.status_code,
+            headers=resp_headers
+        )
+    except Exception as e:
+        await client.aclose()
+        raise HTTPException(status_code=502, detail=f"Lỗi khi stream video: {str(e)}")
+
 # --- MULTI-SEGMENT VIDEO & AUDIO TRIMMER ---
 @app.get("/trim")
 @app.get("/api/trim")

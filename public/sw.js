@@ -1,4 +1,4 @@
-const CACHE_NAME = 'taimp4mp3-v3.3';
+const CACHE_NAME = 'taimp4mp3-v3.4';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
