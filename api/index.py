@@ -168,12 +168,152 @@ async def analyze_url(req: AnalyzeRequest, request: Request):
 async def download_proxy(
     url: str = Query(..., description="Đường dẫn file media trực tiếp"),
     title: str = Query("video", description="Tên file tải về"),
-    ext: str = Query("mp4", description="Đuôi định dạng file (mp4, mp3)"),
+    ext: str = Query("mp4", description="Đuôi định dạng file (mp4, mp3, jpg)"),
+    audio_url: Optional[str] = Query(None, description="Đường dẫn âm thanh nếu cần ghép video + audio"),
+    is_slideshow: Optional[int] = Query(0, description="1 nếu là tạo video slideshow từ ảnh và nhạc"),
 ):
     decoded_url = urllib.parse.unquote(url)
     safe_name = clean_title(urllib.parse.unquote(title))
     filename = f"{safe_name}.{ext}"
 
+    import re
+    encoded_filename = urllib.parse.quote(filename)
+    ascii_fallback = re.sub(r'[^\x20-\x7E]', '_', filename)
+    content_disposition = f'attachment; filename="{ascii_fallback}"; filename*=UTF-8\'\'{encoded_filename}'
+
+    # 1. Trường hợp tạo Slideshow từ ảnh + nhạc nền (cho Album ảnh TikTok)
+    if is_slideshow and audio_url:
+        decoded_audio = urllib.parse.unquote(audio_url)
+        ffmpeg_bin = get_ffmpeg_path()
+        cmd = [
+            ffmpeg_bin, "-y",
+            "-headers", "User-Agent: Mozilla/5.0\r\nReferer: https://www.tiktok.com/\r\n",
+            "-loop", "1", "-i", decoded_url,
+            "-headers", "User-Agent: Mozilla/5.0\r\nReferer: https://www.tiktok.com/\r\n",
+            "-i", decoded_audio,
+            "-c:v", "libx264", "-preset", "ultrafast", "-tune", "stillimage",
+            "-c:a", "copy",
+            "-pix_fmt", "yuv420p",
+            "-shortest",
+            "-movflags", "frag_keyframe+empty_moov",
+            "-f", "mp4",
+            "pipe:1"
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        async def slideshow_stream():
+            try:
+                while True:
+                    chunk = await proc.stdout.read(64 * 1024)
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                if proc.returncode is None:
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
+
+        return StreamingResponse(
+            slideshow_stream(),
+            media_type="video/mp4",
+            headers={
+                "Content-Disposition": content_disposition,
+                "Accept-Ranges": "bytes",
+            }
+        )
+
+    # 2. Trường hợp ghép Video + Audio (YouTube DASH)
+    if audio_url and ext == "mp4":
+        decoded_audio = urllib.parse.unquote(audio_url)
+        ffmpeg_bin = get_ffmpeg_path()
+        v_headers = get_stream_headers(decoded_url)
+        a_headers = get_stream_headers(decoded_audio)
+        cmd = [
+            ffmpeg_bin, "-y",
+            "-headers", v_headers,
+            "-i", decoded_url,
+            "-headers", a_headers,
+            "-i", decoded_audio,
+            "-c", "copy",
+            "-movflags", "frag_keyframe+empty_moov",
+            "-f", "mp4",
+            "pipe:1"
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        async def mux_stream():
+            try:
+                while True:
+                    chunk = await proc.stdout.read(64 * 1024)
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                if proc.returncode is None:
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
+
+        return StreamingResponse(
+            mux_stream(),
+            media_type="video/mp4",
+            headers={
+                "Content-Disposition": content_disposition,
+                "Accept-Ranges": "bytes",
+            }
+        )
+
+    # 3. Trường hợp tải MP3 tách từ video có sẵn
+    if ext == "mp3" and not any(k in decoded_url for k in [".mp3", "audio", "sound", "music"]):
+        ffmpeg_bin = get_ffmpeg_path()
+        v_headers = get_stream_headers(decoded_url)
+        cmd = [
+            ffmpeg_bin, "-y",
+            "-headers", v_headers,
+            "-i", decoded_url,
+            "-vn",
+            "-c:a", "libmp3lame", "-q:a", "2",
+            "-f", "mp3",
+            "pipe:1"
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        async def mp3_stream():
+            try:
+                while True:
+                    chunk = await proc.stdout.read(64 * 1024)
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                if proc.returncode is None:
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
+
+        return StreamingResponse(
+            mp3_stream(),
+            media_type="audio/mpeg",
+            headers={
+                "Content-Disposition": content_disposition,
+                "Accept-Ranges": "bytes",
+            }
+        )
+
+    # 4. Stream trực tiếp (Facebook, TikTok Video gốc, Ảnh JPG, MP3 direct)
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -192,7 +332,7 @@ async def download_proxy(
         req = client.build_request("GET", decoded_url, headers=headers)
         res = await client.send(req, stream=True)
 
-        media_type = "video/mp4" if ext == "mp4" else "audio/mpeg"
+        media_type = "video/mp4" if ext == "mp4" else ("image/jpeg" if ext in ["jpg", "jpeg"] else "audio/mpeg")
 
         async def stream_generator():
             try:
@@ -201,11 +341,6 @@ async def download_proxy(
             finally:
                 await res.aclose()
                 await client.aclose()
-
-        import re
-        encoded_filename = urllib.parse.quote(filename)
-        ascii_fallback = re.sub(r'[^\x20-\x7E]', '_', filename)
-        content_disposition = f'attachment; filename="{ascii_fallback}"; filename*=UTF-8\'\'{encoded_filename}'
 
         return StreamingResponse(
             stream_generator(),
@@ -224,9 +359,52 @@ async def download_proxy(
 async def stream_proxy(
     request: Request,
     url: str = Query(..., description="Đường dẫn file media trực tiếp để phát trong player"),
+    audio_url: Optional[str] = Query(None, description="Đường dẫn âm thanh nếu cần ghép phát"),
 ):
-    """Proxy video trực tiếp vào thẻ <video> của trình duyệt với Range Header và Referer chuẩn."""
+    """Proxy media trực tiếp vào thẻ <video> của trình duyệt với Range Header và hỗ trợ ghép audio on-the-fly."""
     decoded_url = urllib.parse.unquote(url)
+
+    if audio_url:
+        decoded_audio = urllib.parse.unquote(audio_url)
+        ffmpeg_bin = get_ffmpeg_path()
+        v_headers = get_stream_headers(decoded_url)
+        a_headers = get_stream_headers(decoded_audio)
+        cmd = [
+            ffmpeg_bin, "-y",
+            "-headers", v_headers,
+            "-i", decoded_url,
+            "-headers", a_headers,
+            "-i", decoded_audio,
+            "-c", "copy",
+            "-movflags", "frag_keyframe+empty_moov",
+            "-f", "mp4",
+            "pipe:1"
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        async def stream_mux_gen():
+            try:
+                while True:
+                    chunk = await proc.stdout.read(64 * 1024)
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                if proc.returncode is None:
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
+
+        return StreamingResponse(
+            stream_mux_gen(),
+            media_type="video/mp4",
+            headers={"Accept-Ranges": "bytes", "Content-Type": "video/mp4"}
+        )
+
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "

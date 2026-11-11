@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let segmentCounter = 1;
   let currentDirectStreamUrl = '';
   let activeTrimTimer = null;
+  let currentPhotoIndex = 0;
 
   // --- DOM Elements ---
   const form = document.getElementById('form-analyze');
@@ -60,6 +61,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // In-Page Player & Multi-Segment Trimmer Elements
   const inlineVideoPlayer = document.getElementById('inline-video-player');
+  const inlinePhotoGallery = document.getElementById('inline-photo-gallery');
+  const photoGalleryImg = document.getElementById('photo-gallery-img');
+  const btnPhotoPrev = document.getElementById('btn-photo-prev');
+  const btnPhotoNext = document.getElementById('btn-photo-next');
+  const photoCounter = document.getElementById('photo-counter');
+  const playerSectionTitle = document.getElementById('player-section-title');
+  const tabFilterImages = document.getElementById('tab-filter-images');
   const playerTimeDisplay = document.getElementById('player-time-display');
   const btnModeKeep = document.getElementById('btn-mode-keep');
   const btnModeRemove = document.getElementById('btn-mode-remove');
@@ -545,12 +553,26 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Render Result Card ---
   function renderResult(data) {
     resThumbnail.src = data.thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60';
-    resDuration.textContent = data.duration_str || 'Video';
+    resDuration.textContent = data.duration_str || (data.images && data.images.length > 0 ? `${data.images.length} Ảnh` : 'Video');
     resTitle.textContent = data.title;
     resAuthor.querySelector('span').textContent = data.author || 'Tác giả';
 
     const platform = detectPlatform(data.url) || { name: data.platform.toUpperCase(), color: 'blue' };
     resPlatformBadge.textContent = platform.name;
+
+    const hasImages = Array.isArray(data.images) && data.images.length > 0;
+    if (hasImages) {
+      if (playerSectionTitle) playerSectionTitle.textContent = `Bộ Sưu Tập ${data.images.length} Ảnh TikTok & Nhạc Nền`;
+      if (inlinePhotoGallery) {
+        inlinePhotoGallery.classList.remove('hidden');
+        showPhoto(0);
+      }
+      if (tabFilterImages) tabFilterImages.classList.remove('hidden');
+    } else {
+      if (playerSectionTitle) playerSectionTitle.textContent = 'Cửa Sổ Xem Trước Video MP4';
+      if (inlinePhotoGallery) inlinePhotoGallery.classList.add('hidden');
+      if (tabFilterImages) tabFilterImages.classList.add('hidden');
+    }
 
     const firstVideoFormat = data.formats.find((f) => f.type === 'video' && (f.direct_url || f.proxy_url));
     const firstAudioFormat = data.formats.find((f) => f.type === 'audio' && (f.direct_url || f.proxy_url));
@@ -558,8 +580,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (streamTarget) {
       currentDirectStreamUrl = streamTarget.direct_url || streamTarget.proxy_url;
-      // Dùng proxy stream qua /api/stream để hỗ trợ Range seeking và Referer chuẩn, tránh bị CDN TikTok/Facebook chặn hotlinking
-      const streamUrl = `${currentApiBase.replace(/\/$/, '')}/api/stream?url=${encodeURIComponent(currentDirectStreamUrl)}`;
+      // Dùng proxy stream qua /api/stream để hỗ trợ Range seeking, ghép DASH audio và Referer chuẩn
+      let streamUrl = `${currentApiBase.replace(/\/$/, '')}/api/stream?url=${encodeURIComponent(currentDirectStreamUrl)}`;
+      if (streamTarget.audio_url) {
+        streamUrl += `&audio_url=${encodeURIComponent(streamTarget.audio_url)}`;
+      }
       inlineVideoPlayer.src = streamUrl;
       inlineVideoPlayer.load();
 
@@ -579,6 +604,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     resultContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function showPhoto(idx) {
+    if (!currentMediaData || !currentMediaData.images || currentMediaData.images.length === 0) return;
+    if (idx < 0) idx = currentMediaData.images.length - 1;
+    if (idx >= currentMediaData.images.length) idx = 0;
+    currentPhotoIndex = idx;
+    if (photoGalleryImg) photoGalleryImg.src = currentMediaData.images[currentPhotoIndex];
+    if (photoCounter) photoCounter.textContent = `${currentPhotoIndex + 1} / ${currentMediaData.images.length}`;
+  }
+
+  if (btnPhotoPrev) {
+    btnPhotoPrev.addEventListener('click', () => showPhoto(currentPhotoIndex - 1));
+  }
+  if (btnPhotoNext) {
+    btnPhotoNext.addEventListener('click', () => showPhoto(currentPhotoIndex + 1));
   }
 
   // Time display on player
@@ -648,6 +689,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const formats = currentMediaData.formats.filter((f) => {
       if (currentFilter === 'video') return f.type === 'video';
       if (currentFilter === 'audio') return f.type === 'audio';
+      if (currentFilter === 'image') return f.type === 'image';
       return true;
     });
 
@@ -662,21 +704,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     formats.forEach((fmt) => {
       const isAudio = fmt.type === 'audio';
-      const isNoWm = fmt.id.includes('nowatermark');
+      const isImage = fmt.type === 'image';
+      const isNoWm = fmt.id.includes('nowatermark') || fmt.id.includes('nowm');
       const targetDownloadUrl = fmt.proxy_url || fmt.direct_url;
 
       const card = document.createElement('div');
       card.className = 'glass-card rounded-xl p-3.5 flex items-center justify-between gap-3 transition-all';
 
+      const iconType = isAudio ? 'music' : (isImage ? 'image' : 'video');
+      const iconColor = isAudio ? 'bg-amber-500/10 text-amber-400' : (isImage ? 'bg-purple-500/10 text-purple-400' : (isNoWm ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'));
+      const badgeHtml = isImage 
+        ? '<span class="px-1.5 py-0.2 text-[9px] font-extrabold bg-purple-500/20 text-purple-300 rounded border border-purple-500/30">ẢNH GỐC</span>'
+        : (isNoWm ? '<span class="px-1.5 py-0.2 text-[9px] font-extrabold bg-emerald-500/20 text-emerald-300 rounded border border-emerald-500/30">NO-LOGO</span>' : '');
+
       card.innerHTML = `
         <div class="flex items-center gap-3 min-w-0">
-          <div class="w-10 h-10 rounded-lg ${isAudio ? 'bg-amber-500/10 text-amber-400' : isNoWm ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'} flex items-center justify-center shrink-0">
-            <i data-lucide="${isAudio ? 'music' : 'video'}" class="w-5 h-5"></i>
+          <div class="w-10 h-10 rounded-lg ${iconColor} flex items-center justify-center shrink-0">
+            <i data-lucide="${iconType}" class="w-5 h-5"></i>
           </div>
           <div class="min-w-0">
             <div class="flex items-center gap-1.5 flex-wrap">
               <span class="text-sm font-bold text-white truncate">${fmt.quality}</span>
-              ${isNoWm ? '<span class="px-1.5 py-0.2 text-[9px] font-extrabold bg-emerald-500/20 text-emerald-300 rounded border border-emerald-500/30">NO-LOGO</span>' : ''}
+              ${badgeHtml}
             </div>
             <div class="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
               <span>Định dạng: <strong class="uppercase text-slate-300">${fmt.ext}</strong></span>
@@ -698,11 +747,11 @@ document.addEventListener('DOMContentLoaded', () => {
           <button 
             type="button" 
             data-url="${targetDownloadUrl}" 
-            data-title="${encodeURIComponent(currentMediaData.title || 'video')}"
+            data-title="${encodeURIComponent(currentMediaData.title || 'media')}"
             data-ext="${fmt.ext}"
             data-quality="${encodeURIComponent(fmt.quality)}"
             data-size="${fmt.filesize_str || ''}"
-            class="btn-trigger-download px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 shadow-md shadow-blue-500/20 transition-transform active:scale-95"
+            class="btn-trigger-download px-3 py-1.5 text-xs font-bold rounded-lg ${isImage ? 'bg-purple-600 hover:bg-purple-500' : (isAudio ? 'bg-amber-600 hover:bg-amber-500' : 'bg-blue-600 hover:bg-blue-500')} text-white flex items-center gap-1.5 shadow-md transition-transform active:scale-95"
           >
             <i data-lucide="download" class="w-3.5 h-3.5"></i>
             <span>Tải về</span>
@@ -772,6 +821,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (options.ext === 'mp3') {
       renameBadgeIcon.innerHTML = '<i data-lucide="music" class="w-5 h-5 text-amber-400"></i>';
       renameBadgeIcon.className = 'w-10 h-10 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0';
+    } else if (options.ext === 'jpg' || options.ext === 'jpeg') {
+      renameBadgeIcon.innerHTML = '<i data-lucide="image" class="w-5 h-5 text-purple-400"></i>';
+      renameBadgeIcon.className = 'w-10 h-10 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0';
     } else {
       renameBadgeIcon.innerHTML = '<i data-lucide="video" class="w-5 h-5 text-blue-400"></i>';
       renameBadgeIcon.className = 'w-10 h-10 rounded-lg bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0';
@@ -856,7 +908,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (firstVideo) {
       previewTitle.textContent = currentMediaData.title;
       const targetUrl = firstVideo.direct_url || firstVideo.proxy_url;
-      previewPlayer.src = `${currentApiBase.replace(/\/$/, '')}/api/stream?url=${encodeURIComponent(targetUrl)}`;
+      let streamUrl = `${currentApiBase.replace(/\/$/, '')}/api/stream?url=${encodeURIComponent(targetUrl)}`;
+      if (firstVideo.audio_url) {
+        streamUrl += `&audio_url=${encodeURIComponent(firstVideo.audio_url)}`;
+      }
+      previewPlayer.src = streamUrl;
       modalPreview.classList.remove('hidden');
       previewPlayer.play().catch(() => {});
     } else {

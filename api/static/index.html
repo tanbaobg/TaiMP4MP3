@@ -326,19 +326,36 @@
           </div>
         </div>
 
-        <!-- In-Page Video Preview Player -->
+        <!-- In-Page Video & Photo Preview Player -->
         <div class="mt-5 pt-4 border-t border-slate-800/80">
           <div class="flex items-center justify-between mb-2">
             <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
               <i data-lucide="play" class="w-4 h-4 text-blue-400"></i>
-              <span>Cửa Sổ Xem Trước Video MP4</span>
+              <span id="player-section-title">Cửa Sổ Xem Trước Video MP4</span>
             </span>
             <span id="player-time-display" class="text-[11px] font-mono text-slate-400">
               00:00 / 00:00
             </span>
           </div>
           <div class="relative w-full aspect-video rounded-xl overflow-hidden bg-black border border-slate-800 shadow-xl">
-            <video id="inline-video-player" controls preload="metadata" playsinline class="w-full h-full object-contain"></video>
+            <video id="inline-video-player" controls preload="metadata" playsinline referrerpolicy="no-referrer" class="w-full h-full object-contain"></video>
+            <!-- Photo Gallery Overlay (cho dạng Album Ảnh TikTok) -->
+            <div id="inline-photo-gallery" class="hidden absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-2">
+              <img id="photo-gallery-img" src="" alt="TikTok Photo" class="max-h-[82%] max-w-full object-contain rounded-lg shadow-md" referrerpolicy="no-referrer">
+              <div class="absolute bottom-2.5 left-0 right-0 flex items-center justify-center gap-2.5 z-10">
+                <button type="button" id="btn-photo-prev" class="px-2.5 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-white border border-slate-700/80 shadow-md text-xs font-bold flex items-center gap-1 active:scale-95 transition-all">
+                  <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                  <span>Trước</span>
+                </button>
+                <span id="photo-counter" class="px-3 py-1 rounded-lg bg-slate-900/90 text-xs font-mono font-bold text-emerald-400 border border-slate-700/80 shadow-inner">
+                  1 / 1
+                </span>
+                <button type="button" id="btn-photo-next" class="px-2.5 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-white border border-slate-700/80 shadow-md text-xs font-bold flex items-center gap-1 active:scale-95 transition-all">
+                  <span>Sau</span>
+                  <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -427,7 +444,7 @@
           <div class="flex items-center justify-between mb-3">
             <span class="text-xs font-bold text-slate-300">Hoặc tải trọn vẹn toàn bộ video:</span>
           </div>
-          <div class="flex items-center gap-2 mb-4">
+          <div class="flex items-center gap-2 mb-4 flex-wrap">
             <button data-filter="all" class="format-tab px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white">
               Tất cả định dạng
             </button>
@@ -436,6 +453,9 @@
             </button>
             <button data-filter="audio" class="format-tab px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 hover:text-white">
               🎵 Âm thanh MP3
+            </button>
+            <button data-filter="image" id="tab-filter-images" class="hidden format-tab px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 hover:text-white">
+              📸 Album Ảnh
             </button>
           </div>
 
@@ -855,6 +875,6 @@
   </footer>
 
   <!-- App Logic -->
-  <script src="/app.js?v=3.4"></script>
+  <script src="/app.js?v=3.5"></script>
 </body>
 </html>
