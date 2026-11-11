@@ -2,7 +2,7 @@ import os
 import shutil
 import asyncio
 import re
-from typing import Optional, Tuple
+from typing import Optional, List, Tuple
 
 def get_ffmpeg_path() -> str:
     try:
@@ -15,13 +15,12 @@ def get_ffmpeg_path() -> str:
     which_exe = shutil.which("ffmpeg")
     return which_exe or "ffmpeg"
 
-def parse_time(val: Optional[str]) -> float:
+def parse_time(val) -> float:
     if val is None:
         return 0.0
     val_str = str(val).strip()
     if not val_str:
         return 0.0
-    # Format HH:MM:SS or MM:SS or SS.S
     parts = val_str.split(":")
     try:
         if len(parts) == 3:
@@ -33,7 +32,7 @@ def parse_time(val: Optional[str]) -> float:
         return 0.0
 
 def format_time_code(seconds: float) -> str:
-    sec = max(0.0, seconds)
+    sec = max(0.0, float(seconds or 0))
     m, s = divmod(int(sec), 60)
     h, m = divmod(m, 60)
     return f"{h:02d}:{m:02d}:{s:02d}"
@@ -47,3 +46,36 @@ def get_stream_headers(url: str) -> str:
     elif "facebook" in url or "fbcdn" in url:
         headers.append("Referer: https://www.facebook.com/")
     return "\r\n".join(headers) + "\r\n"
+
+def calculate_kept_intervals(segments: List[Tuple[float, float]], mode: str, total_duration: float) -> List[Tuple[float, float]]:
+    cleaned = []
+    for s, e in segments:
+        s_val = max(0.0, float(s))
+        e_val = max(s_val + 0.1, float(e))
+        cleaned.append((s_val, e_val))
+    cleaned.sort(key=lambda x: x[0])
+
+    # Merge overlapping intervals
+    merged = []
+    for s, e in cleaned:
+        if not merged:
+            merged.append([s, e])
+        elif s <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], e)
+        else:
+            merged.append([s, e])
+
+    if mode == "keep":
+        return [(round(m[0], 2), round(m[1], 2)) for m in merged]
+    else:
+        # Complement of merged
+        kept = []
+        cur = 0.0
+        dur = max(total_duration, merged[-1][1] if merged else 60.0)
+        for s, e in merged:
+            if s > cur + 0.1:
+                kept.append((round(cur, 2), round(s, 2)))
+            cur = max(cur, e)
+        if dur > cur + 0.1:
+            kept.append((round(cur, 2), round(dur, 2)))
+        return kept

@@ -1,6 +1,8 @@
 import os
 import urllib.parse
+import json
 import asyncio
+from typing import Optional, List
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, RedirectResponse
@@ -10,15 +12,15 @@ import yt_dlp
 
 try:
     from extractor import extract_info, MediaInfo, clean_title
-    from trimmer import get_ffmpeg_path, parse_time, format_time_code, get_stream_headers
+    from trimmer import get_ffmpeg_path, parse_time, format_time_code, get_stream_headers, calculate_kept_intervals
 except ImportError:
     from .extractor import extract_info, MediaInfo, clean_title
-    from .trimmer import get_ffmpeg_path, parse_time, format_time_code, get_stream_headers
+    from .trimmer import get_ffmpeg_path, parse_time, format_time_code, get_stream_headers, calculate_kept_intervals
 
 app = FastAPI(
     title="TaiMP4MP3 Serverless",
-    description="Web, API & Video Trimmer Serverless chạy trên Vercel",
-    version="1.1.0",
+    description="Web, API & Multi-Segment Video Trimmer Serverless chạy trên Vercel",
+    version="1.2.0",
 )
 
 app.add_middleware(
@@ -106,7 +108,8 @@ def api_status():
         "app": "TaiMP4MP3 Serverless API",
         "platform": "Vercel",
         "status": "online",
-        "features": ["video_download", "audio_extract", "video_trim", "audio_trim"],
+        "version": "1.2.0",
+        "features": ["video_download", "audio_extract", "multi_segment_trim", "keep_remove_modes"],
         "yt_dlp": yt_dlp.version.__version__,
     }
 
@@ -115,7 +118,7 @@ def api_status():
 def health_check():
     return {
         "status": "healthy",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "yt_dlp": yt_dlp.version.__version__,
     }
 
@@ -198,21 +201,20 @@ async def download_proxy(
         await client.aclose()
         raise HTTPException(status_code=502, detail=f"Lỗi khi tải stream: {str(e)}")
 
-# --- VIDEO & AUDIO TRIMMER ENDPOINT ---
+# --- MULTI-SEGMENT VIDEO & AUDIO TRIMMER ---
 @app.get("/trim")
 @app.get("/api/trim")
 async def trim_media(
     url: str = Query(..., description="Đường dẫn file media trực tiếp"),
-    start: str = Query("0", description="Thời điểm bắt đầu"),
-    end: str = Query("0", description="Thời điểm kết thúc"),
-    mode: str = Query("keep", description="'keep' hoặc 'remove'"),
+    start: Optional[str] = Query(None, description="Thời điểm bắt đầu"),
+    end: Optional[str] = Query(None, description="Thời điểm kết thúc"),
+    segments: Optional[str] = Query(None, description="Mảng các đoạn JSON [{'start':..., 'end':...}]"),
+    mode: str = Query("keep", description="'keep' để lấy các đoạn, 'remove' để cắt bỏ các đoạn"),
     type: str = Query("video", description="'video' hoặc 'audio'"),
     duration: float = Query(0.0, description="Tổng thời lượng"),
     title: str = Query("trimmed", description="Tên file tải về"),
 ):
     decoded_url = urllib.parse.unquote(url)
-    start_sec = parse_time(start)
-    end_sec = parse_time(end)
     safe_title = clean_title(urllib.parse.unquote(title))
     ext = "mp4" if type == "video" else "mp3"
     media_type = "video/mp4" if type == "video" else "audio/mpeg"
@@ -220,17 +222,41 @@ async def trim_media(
     ffmpeg_bin = get_ffmpeg_path()
     headers_str = get_stream_headers(decoded_url)
 
-    if mode == "keep":
-        if end_sec <= start_sec:
-            end_sec = start_sec + 30.0
+    # Parse segments
+    raw_segments = []
+    if segments:
+        try:
+            parsed = json.loads(urllib.parse.unquote(segments))
+            if isinstance(parsed, list):
+                for item in parsed:
+                    s = parse_time(item.get("start"))
+                    e = parse_time(item.get("end"))
+                    if e > s:
+                        raw_segments.append((s, e))
+        except Exception:
+            pass
 
-        filename = f"{safe_title}_doan_{int(start_sec)}s-{int(end_sec)}s.{ext}"
+    if not raw_segments:
+        s_val = parse_time(start) if start else 0.0
+        e_val = parse_time(end) if end else (s_val + 30.0)
+        raw_segments = [(s_val, e_val)]
+
+    kept_intervals = calculate_kept_intervals(raw_segments, mode=mode, total_duration=duration)
+    if not kept_intervals:
+        kept_intervals = [(0.0, max(duration, 30.0))]
+
+    # Build filename
+    action_label = "lay" if mode == "keep" else "bo"
+    filename = f"{safe_title}_{action_label}_{len(raw_segments)}doan.{ext}"
+
+    # Single segment optimization (Lossless stream copy)
+    if len(kept_intervals) == 1:
+        k_start, k_end = kept_intervals[0]
         if type == "video":
             cmd = [
-                ffmpeg_bin,
-                "-y",
-                "-ss", str(start_sec),
-                "-to", str(end_sec),
+                ffmpeg_bin, "-y",
+                "-ss", str(k_start),
+                "-to", str(k_end),
                 "-headers", headers_str,
                 "-i", decoded_url,
                 "-c", "copy",
@@ -240,60 +266,50 @@ async def trim_media(
             ]
         else:
             cmd = [
-                ffmpeg_bin,
-                "-y",
-                "-ss", str(start_sec),
-                "-to", str(end_sec),
+                ffmpeg_bin, "-y",
+                "-ss", str(k_start),
+                "-to", str(k_end),
                 "-headers", headers_str,
                 "-i", decoded_url,
                 "-vn",
-                "-c:a", "libmp3lame",
-                "-q:a", "2",
+                "-c:a", "libmp3lame", "-q:a", "2",
                 "-f", "mp3",
                 "pipe:1"
             ]
     else:
-        # Mode == "remove" (cut out start to end)
-        total_dur = duration if duration > end_sec else end_sec + 60.0
-        filename = f"{safe_title}_bo_{int(start_sec)}s-{int(end_sec)}s.{ext}"
+        # Multi-segment concat filtering
+        filter_parts = []
+        concat_inputs = []
+        for i, (k_start, k_end) in enumerate(kept_intervals):
+            if type == "video":
+                filter_parts.append(f"[0:v]trim={k_start}:{k_end},setpts=PTS-STARTPTS[v{i}]")
+                concat_inputs.append(f"[v{i}]")
+            filter_parts.append(f"[0:a]atrim={k_start}:{k_end},asetpts=PTS-STARTPTS[a{i}]")
+            concat_inputs.append(f"[a{i}]")
+
         if type == "video":
-            filter_str = (
-                f"[0:v]trim=0:{start_sec},setpts=PTS-STARTPTS[v1];"
-                f"[0:v]trim={end_sec}:{total_dur},setpts=PTS-STARTPTS[v2];"
-                f"[0:a]atrim=0:{start_sec},asetpts=PTS-STARTPTS[a1];"
-                f"[0:a]atrim={end_sec}:{total_dur},asetpts=PTS-STARTPTS[a2];"
-                f"[v1][a1][v2][a2]concat=n=2:v=1:a=1[outv][outa]"
-            )
+            filter_parts.append(f"{''.join(concat_inputs)}concat=n={len(kept_intervals)}:v=1:a=1[outv][outa]")
             cmd = [
-                ffmpeg_bin,
-                "-y",
+                ffmpeg_bin, "-y",
                 "-headers", headers_str,
                 "-i", decoded_url,
-                "-filter_complex", filter_str,
-                "-map", "[outv]",
-                "-map", "[outa]",
-                "-c:v", "libx264",
-                "-preset", "ultrafast",
+                "-filter_complex", ";".join(filter_parts),
+                "-map", "[outv]", "-map", "[outa]",
+                "-c:v", "libx264", "-preset", "ultrafast",
                 "-c:a", "aac",
                 "-movflags", "frag_keyframe+empty_moov+default_base_moof",
                 "-f", "mp4",
                 "pipe:1"
             ]
         else:
-            filter_str = (
-                f"[0:a]atrim=0:{start_sec},asetpts=PTS-STARTPTS[a1];"
-                f"[0:a]atrim={end_sec}:{total_dur},asetpts=PTS-STARTPTS[a2];"
-                f"[a1][a2]concat=n=2:v=0:a=1[outa]"
-            )
+            filter_parts.append(f"{''.join(concat_inputs)}concat=n={len(kept_intervals)}:v=0:a=1[outa]")
             cmd = [
-                ffmpeg_bin,
-                "-y",
+                ffmpeg_bin, "-y",
                 "-headers", headers_str,
                 "-i", decoded_url,
-                "-filter_complex", filter_str,
+                "-filter_complex", ";".join(filter_parts),
                 "-map", "[outa]",
-                "-c:a", "libmp3lame",
-                "-q:a", "2",
+                "-c:a", "libmp3lame", "-q:a", "2",
                 "-f", "mp3",
                 "pipe:1"
             ]
@@ -331,4 +347,4 @@ async def trim_media(
             }
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi khi cắt video/audio: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi cắt ghép video/audio: {str(e)}")

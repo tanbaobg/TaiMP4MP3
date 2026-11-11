@@ -15,12 +15,14 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentFilter = 'all'; // 'all', 'video', 'audio'
   let deferredInstallPrompt = null;
 
-  // Trimmer State
-  let trimMode = 'keep'; // 'keep' (lấy đoạn) or 'remove' (bỏ đoạn)
-  let trimStartSec = 0;
-  let trimEndSec = 30;
+  // Multi-Segment Trimmer State
+  let trimMode = 'keep'; // 'keep' (lấy các đoạn) or 'remove' (bỏ các đoạn)
+  let segments = [
+    { id: 1, start: 0, end: 30 }
+  ];
+  let segmentCounter = 1;
   let currentDirectStreamUrl = '';
-  let activeTrimPreviewTimer = null;
+  let activeTrimTimer = null;
 
   // --- DOM Elements ---
   const form = document.getElementById('form-analyze');
@@ -45,18 +47,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const formatsGrid = document.getElementById('formats-grid');
   const formatTabs = document.querySelectorAll('.format-tab');
 
-  // In-Page Player & Trimmer Elements
+  // In-Page Player & Multi-Segment Trimmer Elements
   const inlineVideoPlayer = document.getElementById('inline-video-player');
   const playerTimeDisplay = document.getElementById('player-time-display');
   const btnModeKeep = document.getElementById('btn-mode-keep');
   const btnModeRemove = document.getElementById('btn-mode-remove');
-  const trimStartTimeInput = document.getElementById('trim-start-time');
-  const trimEndTimeInput = document.getElementById('trim-end-time');
-  const btnSetStartCurr = document.getElementById('btn-set-start-curr');
-  const btnSetEndCurr = document.getElementById('btn-set-end-curr');
+  const segmentsContainer = document.getElementById('segments-container');
+  const btnAddSegment = document.getElementById('btn-add-segment');
+  const btnPreviewAllTrim = document.getElementById('btn-preview-all-trim');
   const trimDurationBadge = document.getElementById('trim-duration-badge');
   const trimModeDesc = document.getElementById('trim-mode-desc');
-  const btnPreviewTrimSegment = document.getElementById('btn-preview-trim-segment');
   const btnDownloadTrimMp4 = document.getElementById('btn-download-trim-mp4');
   const btnDownloadTrimMp3 = document.getElementById('btn-download-trim-mp3');
   const trimLoading = document.getElementById('trim-loading');
@@ -126,65 +126,319 @@ document.addEventListener('DOMContentLoaded', () => {
     return Math.max(0, parseFloat(code) || 0);
   }
 
-  function updateTrimSummary() {
-    const totalDur = currentMediaData?.duration_seconds || inlineVideoPlayer.duration || 60;
-    trimStartSec = timeCodeToSeconds(trimStartTimeInput.value);
-    trimEndSec = timeCodeToSeconds(trimEndTimeInput.value);
+  // --- Multi-Segment UI Rendering ---
+  function renderSegments() {
+    segmentsContainer.innerHTML = '';
 
-    if (trimEndSec <= trimStartSec) {
-      trimEndSec = Math.min(trimStartSec + 30, totalDur);
-      trimEndTimeInput.value = secondsToTimeCode(trimEndSec);
+    segments.forEach((seg, idx) => {
+      const segEl = document.createElement('div');
+      segEl.className = 'p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2.5 transition-all';
+      segEl.innerHTML = `
+        <div class="flex items-center justify-between pb-1.5 border-b border-slate-800/60">
+          <div class="flex items-center gap-2">
+            <span class="w-6 h-6 rounded-md bg-blue-500/20 text-blue-400 text-xs font-bold flex items-center justify-center">
+              ${idx + 1}
+            </span>
+            <span class="text-xs font-bold text-white">Đoạn ${idx + 1}</span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <!-- Preview single segment -->
+            <button type="button" data-seg-id="${seg.id}" class="btn-preview-seg px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold flex items-center gap-1 transition-colors">
+              <i data-lucide="play" class="w-3 h-3 text-emerald-400"></i>
+              <span>Xem đoạn này</span>
+            </button>
+
+            <!-- Delete button -->
+            ${segments.length > 1 ? `
+              <button type="button" data-seg-id="${seg.id}" class="btn-delete-seg p-1 rounded hover:bg-rose-500/10 text-rose-400 transition-colors" title="Xóa đoạn này">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            ` : ''}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          <!-- Start -->
+          <div class="space-y-1">
+            <div class="flex items-center justify-between">
+              <label class="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Bắt đầu:
+              </label>
+              <button type="button" data-seg-id="${seg.id}" class="btn-set-start-curr text-[11px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-0.5">
+                <i data-lucide="map-pin" class="w-2.5 h-2.5"></i> Vị trí đang xem
+              </button>
+            </div>
+            <input type="text" data-seg-id="${seg.id}" data-type="start" value="${secondsToTimeCode(seg.start)}" class="input-seg-time w-full px-3 py-1.5 bg-slate-900 text-xs font-mono font-bold text-white rounded-lg border border-slate-700 text-center focus:outline-none focus:border-blue-500">
+          </div>
+
+          <!-- End -->
+          <div class="space-y-1">
+            <div class="flex items-center justify-between">
+              <label class="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Kết thúc:
+              </label>
+              <button type="button" data-seg-id="${seg.id}" class="btn-set-end-curr text-[11px] text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-0.5">
+                <i data-lucide="map-pin" class="w-2.5 h-2.5"></i> Vị trí đang xem
+              </button>
+            </div>
+            <input type="text" data-seg-id="${seg.id}" data-type="end" value="${secondsToTimeCode(seg.end)}" class="input-seg-time w-full px-3 py-1.5 bg-slate-900 text-xs font-mono font-bold text-white rounded-lg border border-slate-700 text-center focus:outline-none focus:border-blue-500">
+          </div>
+        </div>
+      `;
+      segmentsContainer.appendChild(segEl);
+    });
+
+    if (window.lucide) {
+      window.lucide.createIcons();
     }
 
+    attachSegmentEvents();
+    updateTrimSummary();
+  }
+
+  function attachSegmentEvents() {
+    // Delete buttons
+    document.querySelectorAll('.btn-delete-seg').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = parseInt(btn.getAttribute('data-seg-id'), 10);
+        segments = segments.filter(s => s.id !== id);
+        renderSegments();
+      });
+    });
+
+    // Set current time for start
+    document.querySelectorAll('.btn-set-start-curr').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = parseInt(btn.getAttribute('data-seg-id'), 10);
+        const seg = segments.find(s => s.id === id);
+        if (seg) {
+          seg.start = inlineVideoPlayer.currentTime || 0;
+          renderSegments();
+          showNotification(`Đoạn ${segments.indexOf(seg) + 1} - Bắt đầu: ${secondsToTimeCode(seg.start)}`);
+        }
+      });
+    });
+
+    // Set current time for end
+    document.querySelectorAll('.btn-set-end-curr').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = parseInt(btn.getAttribute('data-seg-id'), 10);
+        const seg = segments.find(s => s.id === id);
+        if (seg) {
+          seg.end = inlineVideoPlayer.currentTime || 0;
+          renderSegments();
+          showNotification(`Đoạn ${segments.indexOf(seg) + 1} - Kết thúc: ${secondsToTimeCode(seg.end)}`);
+        }
+      });
+    });
+
+    // Time input edits
+    document.querySelectorAll('.input-seg-time').forEach(input => {
+      input.addEventListener('change', () => {
+        const id = parseInt(input.getAttribute('data-seg-id'), 10);
+        const type = input.getAttribute('data-type');
+        const seg = segments.find(s => s.id === id);
+        if (seg) {
+          const valSec = timeCodeToSeconds(input.value);
+          if (type === 'start') seg.start = valSec;
+          else seg.end = valSec;
+          updateTrimSummary();
+        }
+      });
+    });
+
+    // Preview single segment
+    document.querySelectorAll('.btn-preview-seg').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = parseInt(btn.getAttribute('data-seg-id'), 10);
+        const seg = segments.find(s => s.id === id);
+        if (seg) {
+          playSegment(seg.start, seg.end, `Đang phát thử Đoạn ${segments.indexOf(seg) + 1}`);
+        }
+      });
+    });
+  }
+
+  // --- Add Segment Button ---
+  btnAddSegment.addEventListener('click', () => {
+    const totalDur = currentMediaData?.duration_seconds || inlineVideoPlayer.duration || 60;
+    const lastSeg = segments[segments.length - 1];
+    const newStart = lastSeg ? Math.min(lastSeg.end + 5, totalDur) : 0;
+    const newEnd = Math.min(newStart + 30, totalDur);
+
+    segmentCounter++;
+    segments.push({
+      id: segmentCounter,
+      start: newStart,
+      end: newEnd
+    });
+    renderSegments();
+    showNotification(`Đã thêm Đoạn ${segments.length}`);
+  });
+
+  // --- Trim Summary Calculations ---
+  function updateTrimSummary() {
+    const totalDur = currentMediaData?.duration_seconds || inlineVideoPlayer.duration || 60;
+
+    // Calculate kept duration
+    let totalProcessedSec = 0;
     if (trimMode === 'keep') {
-      const segmentDur = Math.max(0, trimEndSec - trimStartSec);
-      trimDurationBadge.textContent = `Thời lượng lấy: ${secondsToTimeCode(segmentDur)}`;
-      trimModeDesc.textContent = `(Sẽ trích xuất đoạn từ ${secondsToTimeCode(trimStartSec)} đến ${secondsToTimeCode(trimEndSec)})`;
+      segments.forEach(s => {
+        totalProcessedSec += Math.max(0, s.end - s.start);
+      });
+      trimDurationBadge.textContent = `Số đoạn chọn: ${segments.length} • Thời lượng ghép: ~${secondsToTimeCode(totalProcessedSec)}`;
+      trimModeDesc.textContent = `(Sẽ trích xuất ${segments.length} đoạn đã chọn và ghép nối lại thành 1 file duy nhất)`;
     } else {
-      const remainingDur = Math.max(0, totalDur - (trimEndSec - trimStartSec));
-      trimDurationBadge.textContent = `Thời lượng còn lại: ~${secondsToTimeCode(remainingDur)}`;
-      trimModeDesc.textContent = `(Sẽ cắt bỏ đoạn từ ${secondsToTimeCode(trimStartSec)} đến ${secondsToTimeCode(trimEndSec)}, ghép phần trước & sau)`;
+      let totalRemovedSec = 0;
+      segments.forEach(s => {
+        totalRemovedSec += Math.max(0, s.end - s.start);
+      });
+      totalProcessedSec = Math.max(0, totalDur - totalRemovedSec);
+      trimDurationBadge.textContent = `Số đoạn cắt bỏ: ${segments.length} • Thời lượng còn lại: ~${secondsToTimeCode(totalProcessedSec)}`;
+      trimModeDesc.textContent = `(Sẽ loại bỏ ${segments.length} đoạn không mong muốn, giữ lại và ghép các phần còn lại)`;
     }
   }
 
-  // --- Real-time Input Validation & UI Updates ---
-  inputUrl.addEventListener('input', () => {
-    const text = inputUrl.value.trim();
-    btnClearUrl.classList.toggle('hidden', text.length === 0);
+  // --- Mode Toggle: Keep (Lấy ghép) vs Remove (Cắt bỏ) ---
+  btnModeKeep.addEventListener('click', () => {
+    trimMode = 'keep';
+    btnModeKeep.className = 'px-3 py-1.5 text-xs font-bold rounded-md bg-blue-600 text-white shadow-sm flex items-center gap-1.5 transition-all';
+    btnModeRemove.className = 'px-3 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white flex items-center gap-1.5 transition-all';
+    updateTrimSummary();
+  });
 
-    const platform = detectPlatform(text);
-    if (platform) {
-      platformIndicator.classList.remove('hidden');
-      platformText.textContent = `Phát hiện: ${platform.name} (${platform.badge})`;
-    } else {
-      platformIndicator.classList.add('hidden');
+  btnModeRemove.addEventListener('click', () => {
+    trimMode = 'remove';
+    btnModeRemove.className = 'px-3 py-1.5 text-xs font-bold rounded-md bg-rose-600 text-white shadow-sm flex items-center gap-1.5 transition-all';
+    btnModeKeep.className = 'px-3 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white flex items-center gap-1.5 transition-all';
+    updateTrimSummary();
+  });
+
+  // --- Preview Segment Player Helper ---
+  function playSegment(startSec, endSec, msg) {
+    if (!inlineVideoPlayer.src) {
+      showNotification('Chưa tải được video để phát thử');
+      return;
     }
-  });
+    if (activeTrimTimer) {
+      clearInterval(activeTrimTimer);
+      activeTrimTimer = null;
+    }
 
-  btnClearUrl.addEventListener('click', () => {
-    inputUrl.value = '';
-    btnClearUrl.classList.add('hidden');
-    platformIndicator.classList.add('hidden');
-    inputUrl.focus();
-  });
+    inlineVideoPlayer.currentTime = startSec;
+    inlineVideoPlayer.play().catch(() => {});
+    showNotification(`${msg}: ${secondsToTimeCode(startSec)} ➔ ${secondsToTimeCode(endSec)}`);
 
-  // --- Clipboard Auto Paste ---
-  btnPasteUrl.addEventListener('click', async () => {
-    try {
-      if (navigator.clipboard && navigator.clipboard.readText) {
-        const text = await navigator.clipboard.readText();
-        if (text) {
-          inputUrl.value = text.trim();
-          inputUrl.dispatchEvent(new Event('input'));
-          showNotification('Đã dán liên kết từ bộ nhớ tạm');
-        }
-      } else {
-        inputUrl.focus();
+    activeTrimTimer = setInterval(() => {
+      if (inlineVideoPlayer.currentTime >= endSec) {
+        inlineVideoPlayer.pause();
+        clearInterval(activeTrimTimer);
+        activeTrimTimer = null;
+        showNotification('Đã phát xong đoạn đã chọn!');
       }
-    } catch {
-      inputUrl.focus();
+    }, 250);
+  }
+
+  // --- Preview All Segments (Sequential Simulation) ---
+  btnPreviewAllTrim.addEventListener('click', () => {
+    if (!inlineVideoPlayer.src || segments.length === 0) return;
+
+    if (activeTrimTimer) {
+      clearInterval(activeTrimTimer);
+      activeTrimTimer = null;
+    }
+
+    if (trimMode === 'keep') {
+      // Sort segments chronologically for preview
+      const sorted = [...segments].sort((a, b) => a.start - b.start);
+      let curIndex = 0;
+
+      function playNext() {
+        if (curIndex >= sorted.length) {
+          inlineVideoPlayer.pause();
+          showNotification('Đã phát thử xong toàn bộ các đoạn ghép!');
+          return;
+        }
+
+        const currentSeg = sorted[curIndex];
+        inlineVideoPlayer.currentTime = currentSeg.start;
+        inlineVideoPlayer.play().catch(() => {});
+        showNotification(`Đang phát thử: Đoạn ${curIndex + 1}/${sorted.length} (${secondsToTimeCode(currentSeg.start)} ➔ ${secondsToTimeCode(currentSeg.end)})`);
+
+        activeTrimTimer = setInterval(() => {
+          if (inlineVideoPlayer.currentTime >= currentSeg.end) {
+            clearInterval(activeTrimTimer);
+            activeTrimTimer = null;
+            curIndex++;
+            playNext();
+          }
+        }, 200);
+      }
+
+      playNext();
+
+    } else {
+      // Remove mode: start from 0, jump across every removed segment
+      const sorted = [...segments].sort((a, b) => a.start - b.start);
+      inlineVideoPlayer.currentTime = 0;
+      inlineVideoPlayer.play().catch(() => {});
+      showNotification(`Đang phát thử video sau khi cắt bỏ ${sorted.length} đoạn...`);
+
+      activeTrimTimer = setInterval(() => {
+        const cur = inlineVideoPlayer.currentTime;
+        for (const r of sorted) {
+          if (cur >= r.start && cur < r.end) {
+            inlineVideoPlayer.currentTime = r.end;
+            showNotification(`Đã nhảy qua đoạn cắt bỏ đến ${secondsToTimeCode(r.end)}`);
+            break;
+          }
+        }
+        if (inlineVideoPlayer.ended) {
+          clearInterval(activeTrimTimer);
+          activeTrimTimer = null;
+        }
+      }, 200);
     }
   });
+
+  // --- Trigger Multi-Segment Download (MP4 / MP3) ---
+  async function triggerTrimDownload(mediaType) {
+    if (!currentMediaData || !currentDirectStreamUrl) {
+      showError('Không tìm thấy nguồn video hợp lệ để cắt');
+      return;
+    }
+
+    trimLoading.classList.remove('hidden');
+    const safeTitle = currentMediaData.title || 'video';
+    const totalDuration = currentMediaData.duration_seconds || inlineVideoPlayer.duration || 60;
+
+    // Clean segments array
+    const cleanSegments = segments.map(s => ({
+      start: Math.round(s.start * 100) / 100,
+      end: Math.round(s.end * 100) / 100
+    }));
+
+    const segmentsJson = encodeURIComponent(JSON.stringify(cleanSegments));
+    const trimApiUrl = `${currentApiBase.replace(/\/$/, '')}/api/trim?url=${encodeURIComponent(currentDirectStreamUrl)}&segments=${segmentsJson}&mode=${trimMode}&type=${mediaType}&duration=${totalDuration}&title=${encodeURIComponent(safeTitle)}`;
+
+    showNotification(`Đang gửi yêu cầu cắt ghép ${segments.length} đoạn (${mediaType.toUpperCase()})...`);
+
+    const dlLink = document.createElement('a');
+    dlLink.href = trimApiUrl;
+    dlLink.setAttribute('download', '');
+    document.body.appendChild(dlLink);
+    dlLink.click();
+    dlLink.remove();
+
+    setTimeout(() => {
+      trimLoading.classList.add('hidden');
+      showNotification(`File ${mediaType.toUpperCase()} đã cắt ghép đang được tải về!`);
+    }, 4500);
+  }
+
+  btnDownloadTrimMp4.addEventListener('click', () => triggerTrimDownload('video'));
+  btnDownloadTrimMp3.addEventListener('click', () => triggerTrimDownload('audio'));
 
   // --- Form Submit (Analyze Media) ---
   form.addEventListener('submit', async (e) => {
@@ -235,18 +489,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // --- Render Result Card with In-Page Player & Trimmer ---
+  // --- Render Result Card ---
   function renderResult(data) {
     resThumbnail.src = data.thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60';
     resDuration.textContent = data.duration_str || 'Video';
     resTitle.textContent = data.title;
     resAuthor.querySelector('span').textContent = data.author || 'Tác giả';
 
-    // Platform Badge
     const platform = detectPlatform(data.url) || { name: data.platform.toUpperCase(), color: 'blue' };
     resPlatformBadge.textContent = platform.name;
 
-    // Find best stream for In-Page Preview & Trimmer
     const firstVideoFormat = data.formats.find((f) => f.type === 'video' && (f.direct_url || f.proxy_url));
     const firstAudioFormat = data.formats.find((f) => f.type === 'audio' && (f.direct_url || f.proxy_url));
     const streamTarget = firstVideoFormat || firstAudioFormat;
@@ -256,13 +508,12 @@ document.addEventListener('DOMContentLoaded', () => {
       inlineVideoPlayer.src = currentDirectStreamUrl;
       inlineVideoPlayer.load();
 
-      // Initialize Trimmer values
       const dur = data.duration_seconds || 30;
-      trimStartSec = 0;
-      trimEndSec = Math.min(dur, 30);
-      trimStartTimeInput.value = secondsToTimeCode(0);
-      trimEndTimeInput.value = secondsToTimeCode(trimEndSec);
-      updateTrimSummary();
+      segmentCounter = 1;
+      segments = [
+        { id: 1, start: 0, end: Math.min(dur, 30) }
+      ];
+      renderSegments();
     }
 
     renderFormats();
@@ -272,123 +523,53 @@ document.addEventListener('DOMContentLoaded', () => {
       window.lucide.createIcons();
     }
 
-    // Smooth scroll down to result
     resultContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // --- In-Page Player Time Tracker ---
+  // Time display on player
   inlineVideoPlayer.addEventListener('timeupdate', () => {
     const cur = secondsToTimeCode(inlineVideoPlayer.currentTime);
     const dur = secondsToTimeCode(inlineVideoPlayer.duration || currentMediaData?.duration_seconds || 0);
     playerTimeDisplay.textContent = `${cur} / ${dur}`;
   });
 
-  // --- Trimmer Controls ---
-  btnSetStartCurr.addEventListener('click', () => {
-    trimStartSec = inlineVideoPlayer.currentTime || 0;
-    trimStartTimeInput.value = secondsToTimeCode(trimStartSec);
-    updateTrimSummary();
-    showNotification(`Đã đặt Bắt đầu: ${secondsToTimeCode(trimStartSec)}`);
-  });
+  // --- Real-time Input Validation ---
+  inputUrl.addEventListener('input', () => {
+    const text = inputUrl.value.trim();
+    btnClearUrl.classList.toggle('hidden', text.length === 0);
 
-  btnSetEndCurr.addEventListener('click', () => {
-    trimEndSec = inlineVideoPlayer.currentTime || 0;
-    trimEndTimeInput.value = secondsToTimeCode(trimEndSec);
-    updateTrimSummary();
-    showNotification(`Đã đặt Kết thúc: ${secondsToTimeCode(trimEndSec)}`);
-  });
-
-  trimStartTimeInput.addEventListener('change', updateTrimSummary);
-  trimEndTimeInput.addEventListener('change', updateTrimSummary);
-
-  // Mode Toggle: Keep (Lấy) vs Remove (Bỏ)
-  btnModeKeep.addEventListener('click', () => {
-    trimMode = 'keep';
-    btnModeKeep.className = 'px-3 py-1.5 text-xs font-bold rounded-md bg-blue-600 text-white shadow-sm flex items-center gap-1.5 transition-all';
-    btnModeRemove.className = 'px-3 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white flex items-center gap-1.5 transition-all';
-    updateTrimSummary();
-  });
-
-  btnModeRemove.addEventListener('click', () => {
-    trimMode = 'remove';
-    btnModeRemove.className = 'px-3 py-1.5 text-xs font-bold rounded-md bg-rose-600 text-white shadow-sm flex items-center gap-1.5 transition-all';
-    btnModeKeep.className = 'px-3 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white flex items-center gap-1.5 transition-all';
-    updateTrimSummary();
-  });
-
-  // Preview Trim Segment
-  btnPreviewTrimSegment.addEventListener('click', () => {
-    updateTrimSummary();
-    if (!inlineVideoPlayer.src) {
-      showNotification('Chưa tải được nguồn video để phát thử');
-      return;
-    }
-
-    if (activeTrimPreviewTimer) {
-      clearInterval(activeTrimPreviewTimer);
-      activeTrimPreviewTimer = null;
-    }
-
-    if (trimMode === 'keep') {
-      inlineVideoPlayer.currentTime = trimStartSec;
-      inlineVideoPlayer.play().catch(() => {});
-      showNotification(`Đang phát thử đoạn từ ${secondsToTimeCode(trimStartSec)} đến ${secondsToTimeCode(trimEndSec)}`);
-
-      activeTrimPreviewTimer = setInterval(() => {
-        if (inlineVideoPlayer.currentTime >= trimEndSec) {
-          inlineVideoPlayer.pause();
-          clearInterval(activeTrimPreviewTimer);
-          activeTrimPreviewTimer = null;
-          showNotification('Đã phát xong đoạn đã chọn!');
-        }
-      }, 250);
+    const platform = detectPlatform(text);
+    if (platform) {
+      platformIndicator.classList.remove('hidden');
+      platformText.textContent = `Phát hiện: ${platform.name} (${platform.badge})`;
     } else {
-      // Mode remove: play from 0, jump across cut segment
-      inlineVideoPlayer.currentTime = 0;
-      inlineVideoPlayer.play().catch(() => {});
-      showNotification(`Đang phát thử: sẽ tự động bỏ qua đoạn từ ${secondsToTimeCode(trimStartSec)} đến ${secondsToTimeCode(trimEndSec)}`);
-
-      activeTrimPreviewTimer = setInterval(() => {
-        if (inlineVideoPlayer.currentTime >= trimStartSec && inlineVideoPlayer.currentTime < trimEndSec) {
-          inlineVideoPlayer.currentTime = trimEndSec;
-          showNotification(`Đã nhảy qua đoạn cắt bỏ đến ${secondsToTimeCode(trimEndSec)}`);
-        }
-      }, 200);
+      platformIndicator.classList.add('hidden');
     }
   });
 
-  // Download Trimmed Media (MP4 / MP3)
-  async function triggerTrimDownload(mediaType) {
-    updateTrimSummary();
-    if (!currentMediaData || !currentDirectStreamUrl) {
-      showError('Không tìm thấy nguồn video hợp lệ để cắt');
-      return;
+  btnClearUrl.addEventListener('click', () => {
+    inputUrl.value = '';
+    btnClearUrl.classList.add('hidden');
+    platformIndicator.classList.add('hidden');
+    inputUrl.focus();
+  });
+
+  btnPasteUrl.addEventListener('click', async () => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          inputUrl.value = text.trim();
+          inputUrl.dispatchEvent(new Event('input'));
+          showNotification('Đã dán liên kết từ bộ nhớ tạm');
+        }
+      } else {
+        inputUrl.focus();
+      }
+    } catch {
+      inputUrl.focus();
     }
-
-    trimLoading.classList.remove('hidden');
-    const safeTitle = currentMediaData.title || 'video';
-    const totalDuration = currentMediaData.duration_seconds || inlineVideoPlayer.duration || 60;
-
-    const trimApiUrl = `${currentApiBase.replace(/\/$/, '')}/api/trim?url=${encodeURIComponent(currentDirectStreamUrl)}&start=${trimStartSec}&end=${trimEndSec}&mode=${trimMode}&type=${mediaType}&duration=${totalDuration}&title=${encodeURIComponent(safeTitle)}`;
-
-    showNotification(`Bắt đầu xử lý cắt ${mediaType.toUpperCase()}...`);
-
-    // Create invisible anchor to trigger file download stream
-    const dlLink = document.createElement('a');
-    dlLink.href = trimApiUrl;
-    dlLink.setAttribute('download', '');
-    document.body.appendChild(dlLink);
-    dlLink.click();
-    dlLink.remove();
-
-    setTimeout(() => {
-      trimLoading.classList.add('hidden');
-      showNotification(`File ${mediaType.toUpperCase()} đã cắt đang được tải về!`);
-    }, 3500);
-  }
-
-  btnDownloadTrimMp4.addEventListener('click', () => triggerTrimDownload('video'));
-  btnDownloadTrimMp3.addEventListener('click', () => triggerTrimDownload('audio'));
+  });
 
   // --- Format Filter Tabs & Cards ---
   formatTabs.forEach((tab) => {
