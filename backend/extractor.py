@@ -82,6 +82,35 @@ def clean_title(title: str) -> str:
     return cleaned[:80] or "video"
 
 
+_cached_youtube_cookiejar = None
+
+def get_youtube_cookiejar():
+    """Tạo hoặc tái sử dụng CookieJar với visitor session cookies từ YouTube để vượt qua kiểm tra Bot trên cloud serverless."""
+    global _cached_youtube_cookiejar
+    if _cached_youtube_cookiejar is not None:
+        return _cached_youtube_cookiejar
+    try:
+        from yt_dlp.cookies import YoutubeDLCookieJar
+        jar = YoutubeDLCookieJar()
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+        req = urllib.request.Request(
+            "https://www.youtube.com/",
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                ),
+                "Accept-Language": "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
+            }
+        )
+        opener.open(req, timeout=5)
+        _cached_youtube_cookiejar = jar
+        return jar
+    except Exception:
+        return None
+
+
 def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInfo]:
     """Bóc tách link video, ảnh và nhạc TikTok không logo tốc độ cao qua TikWM API."""
     try:
@@ -286,6 +315,7 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
     last_err = None
 
     if platform == "youtube":
+        jar = get_youtube_cookiejar()
         # Tự động xoay vòng chiến lược client cho YouTube để vượt qua mọi rào cản
         strategies = [
             {"name": "android", "args": {"player_client": ["android"]}},
@@ -300,6 +330,8 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
                 opts["extractor_args"] = {"youtube": st["args"]}
             try:
                 with yt_dlp.YoutubeDL(opts) as ydl:
+                    if jar:
+                        ydl.cookiejar = jar
                     candidate = ydl.extract_info(url, download=False)
                     if candidate and candidate.get("formats"):
                         info = candidate
