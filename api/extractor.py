@@ -153,8 +153,15 @@ def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInf
                 "Accept": "application/json",
             }
         )
-        with urllib.request.urlopen(req, timeout=12) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
+        data = {}
+        for attempt in range(2):
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            if data.get("code") == 0:
+                break
+            if "limit" in str(data.get("msg", "")).lower() and attempt == 0:
+                import time
+                time.sleep(1.2)
 
         if data.get("code") != 0:
             _last_tiktok_error = f"TikWM returned code {data.get('code')}: {data.get('msg')}"
