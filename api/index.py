@@ -144,38 +144,6 @@ def health_check():
         "yt_dlp": yt_dlp.version.__version__,
     }
 
-@app.get("/api/test_yt")
-def test_yt_clients(id: str = "IlifpVflhk4"):
-    import yt_dlp
-    url = f"https://www.youtube.com/watch?v={id}"
-    clients = [
-        ["tv_embedded"],
-        ["android_music"],
-        ["ios_music"],
-        ["android_creator"],
-        ["web_creator"],
-        ["tv_samsung"],
-        ["mweb"],
-        ["ios"],
-        ["tv"],
-    ]
-    results = {}
-    for c in clients:
-        c_name = "-".join(c)
-        opts = {
-            "quiet": True,
-            "skip_download": True,
-            "socket_timeout": 6,
-            "extractor_args": {"youtube": {"player_client": c}}
-        }
-        try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                results[c_name] = f"SUCCESS: {len(info.get('formats', []))} formats"
-        except Exception as e:
-            results[c_name] = f"FAILED: {str(e)[:90]}"
-    return results
-
 @app.post("/analyze", response_model=MediaInfo)
 @app.post("/api/analyze", response_model=MediaInfo)
 async def analyze_url(req: AnalyzeRequest, request: Request):

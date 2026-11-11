@@ -934,7 +934,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Error Helper ---
   function showError(msg) {
-    errorMessage.textContent = msg;
+    if (msg && (msg.toLowerCase().includes('bot') || msg.toLowerCase().includes('sign in'))) {
+      errorMessage.innerHTML = `
+        <div class="space-y-1">
+          <p class="font-bold text-amber-300">YouTube đang yêu cầu xác minh máy chủ Vercel (Bot Check).</p>
+          <p class="text-[11px] text-slate-300 leading-relaxed">
+            Do địa chỉ IP Datacenter của máy chủ Vercel bị YouTube siết chặt, bạn hãy dùng <strong>ứng dụng Android (.APK)</strong> trên điện thoại hoặc chạy <strong>Backend Localhost</strong> để tải trực tiếp mọi video YouTube mà không bị chặn!
+          </p>
+        </div>
+      `;
+    } else {
+      errorMessage.textContent = msg;
+    }
     errorBox.classList.remove('hidden');
     if (window.lucide) window.lucide.createIcons();
   }
