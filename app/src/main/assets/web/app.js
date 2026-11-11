@@ -852,26 +852,161 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 3000);
   }
 
-  // --- PWA Installation Handler ---
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredInstallPrompt = e;
-    btnPwaInstall.classList.remove('hidden');
-    btnPwaInstall.classList.add('inline-flex');
+  // --- Installation & PWA Management ---
+  const btnOpenInstall = document.getElementById('btn-open-install');
+  const btnBannerInstallPc = document.getElementById('btn-banner-install-pc');
+  const btnBannerInstallPhone = document.getElementById('btn-banner-install-phone');
+  const btnBannerGuide = document.getElementById('btn-banner-guide');
+  const modalInstallGuide = document.getElementById('modal-install-guide');
+  const btnCloseInstallModal = document.getElementById('btn-close-install-modal');
+  const headerInstallText = document.getElementById('header-install-text');
+
+  const tabBtnPc = document.getElementById('tab-btn-pc');
+  const tabBtnAndroid = document.getElementById('tab-btn-android');
+  const tabBtnIos = document.getElementById('tab-btn-ios');
+  const tabContentPc = document.getElementById('tab-content-pc');
+  const tabContentAndroid = document.getElementById('tab-content-android');
+  const tabContentIos = document.getElementById('tab-content-ios');
+  const btnModalTriggerInstall = document.getElementById('btn-modal-trigger-install');
+
+  // Detect Device
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isAndroid = /Android/.test(navigator.userAgent);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+  if (isStandalone) {
+    if (headerInstallText) {
+      headerInstallText.textContent = 'Đã Cài Đặt';
+      btnOpenInstall.classList.replace('text-emerald-400', 'text-blue-400');
+      btnOpenInstall.classList.replace('bg-emerald-600/20', 'bg-blue-600/20');
+      btnOpenInstall.classList.replace('border-emerald-500/30', 'border-blue-500/30');
+    }
+  }
+
+  function switchInstallTab(tab) {
+    [tabBtnPc, tabBtnAndroid, tabBtnIos].forEach(b => {
+      b.classList.remove('bg-blue-600', 'text-white');
+      b.classList.add('text-slate-400');
+    });
+    [tabContentPc, tabContentAndroid, tabContentIos].forEach(c => c.classList.add('hidden'));
+
+    if (tab === 'android') {
+      tabBtnAndroid.classList.add('bg-blue-600', 'text-white');
+      tabBtnAndroid.classList.remove('text-slate-400');
+      tabContentAndroid.classList.remove('hidden');
+    } else if (tab === 'ios') {
+      tabBtnIos.classList.add('bg-blue-600', 'text-white');
+      tabBtnIos.classList.remove('text-slate-400');
+      tabContentIos.classList.remove('hidden');
+    } else {
+      tabBtnPc.classList.add('bg-blue-600', 'text-white');
+      tabBtnPc.classList.remove('text-slate-400');
+      tabContentPc.classList.remove('hidden');
+    }
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  function openInstallModal(preferredTab) {
+    let target = preferredTab;
+    if (!target) {
+      if (isIOS) target = 'ios';
+      else if (isAndroid) target = 'android';
+      else target = 'pc';
+    }
+    switchInstallTab(target);
+    modalInstallGuide.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  if (tabBtnPc) tabBtnPc.addEventListener('click', () => switchInstallTab('pc'));
+  if (tabBtnAndroid) tabBtnAndroid.addEventListener('click', () => switchInstallTab('android'));
+  if (tabBtnIos) tabBtnIos.addEventListener('click', () => switchInstallTab('ios'));
+
+  if (btnOpenInstall) {
+    btnOpenInstall.addEventListener('click', () => {
+      if (deferredInstallPrompt) {
+        triggerBrowserInstall();
+      } else {
+        openInstallModal();
+      }
+    });
+  }
+
+  if (btnBannerInstallPc) {
+    btnBannerInstallPc.addEventListener('click', () => {
+      if (deferredInstallPrompt && !isAndroid && !isIOS) {
+        triggerBrowserInstall();
+      } else {
+        openInstallModal('pc');
+      }
+    });
+  }
+
+  if (btnBannerInstallPhone) {
+    btnBannerInstallPhone.addEventListener('click', () => {
+      if (isIOS) {
+        openInstallModal('ios');
+      } else {
+        openInstallModal('android');
+      }
+    });
+  }
+
+  if (btnBannerGuide) {
+    btnBannerGuide.addEventListener('click', () => openInstallModal());
+  }
+
+  if (btnCloseInstallModal) {
+    btnCloseInstallModal.addEventListener('click', () => {
+      modalInstallGuide.classList.add('hidden');
+    });
+  }
+
+  modalInstallGuide?.addEventListener('click', (e) => {
+    if (e.target === modalInstallGuide) {
+      modalInstallGuide.classList.add('hidden');
+    }
   });
 
-  btnPwaInstall.addEventListener('click', async () => {
-    if (!deferredInstallPrompt) return;
+  async function triggerBrowserInstall() {
+    if (!deferredInstallPrompt) {
+      showToast('Trình duyệt chưa sẵn sàng hoặc đã cài đặt. Vui lòng xem hướng dẫn!');
+      openInstallModal('pc');
+      return;
+    }
     deferredInstallPrompt.prompt();
     const { outcome } = await deferredInstallPrompt.userChoice;
     if (outcome === 'accepted') {
-      btnPwaInstall.classList.add('hidden');
+      showToast('🎉 Đã cài đặt TaiMP4MP3 thành công!');
+      modalInstallGuide?.classList.add('hidden');
+      if (headerInstallText) headerInstallText.textContent = 'Đã Cài Đặt';
     }
     deferredInstallPrompt = null;
+  }
+
+  if (btnModalTriggerInstall) {
+    btnModalTriggerInstall.addEventListener('click', triggerBrowserInstall);
+  }
+
+  // PWA beforeinstallprompt event
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    if (btnModalTriggerInstall) {
+      btnModalTriggerInstall.classList.remove('opacity-75');
+    }
+  });
+
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    showToast('🎉 TaiMP4MP3 đã được cài đặt vào thiết bị của bạn!');
+    if (headerInstallText) headerInstallText.textContent = 'Đã Cài Đặt';
   });
 
   if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('Service worker registration:', err);
+    });
   }
 
   // Auto-fill from URL Query Parameter

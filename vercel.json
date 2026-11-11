@@ -23,6 +23,9 @@
   ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.py" },
+    { "source": "/assets/(.*)", "destination": "/public/assets/$1" },
+    { "source": "/manifest.json", "destination": "/public/manifest.json" },
+    { "source": "/sw.js", "destination": "/public/sw.js" },
     { "source": "/taimp4mp3-latest.apk", "destination": "/public/taimp4mp3-latest.apk" },
     { "source": "/taimp4mp3.apk", "destination": "/public/taimp4mp3.apk" },
     { "source": "/(.*)", "destination": "/api/index.py" }

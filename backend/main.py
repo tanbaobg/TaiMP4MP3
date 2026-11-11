@@ -86,6 +86,25 @@ def serve_sw():
         return FileResponse(path, media_type="application/javascript")
     raise HTTPException(status_code=404)
 
+@app.get("/assets/{file_path:path}")
+def serve_assets(file_path: str):
+    path = find_file(os.path.join("assets", file_path))
+    if path and os.path.exists(path):
+        media_type = "image/png"
+        if file_path.endswith(".svg"):
+            media_type = "image/svg+xml"
+        elif file_path.endswith(".json"):
+            media_type = "application/json"
+        return FileResponse(path, media_type=media_type)
+    raise HTTPException(status_code=404, detail="Asset not found")
+
+@app.get("/apple-touch-icon.png")
+def serve_apple_touch():
+    path = find_file(os.path.join("assets", "apple-touch-icon.png"))
+    if path and os.path.exists(path):
+        return FileResponse(path, media_type="image/png")
+    raise HTTPException(status_code=404)
+
 @app.get("/taimp4mp3-latest.apk")
 @app.get("/taimp4mp3.apk")
 def download_apk():

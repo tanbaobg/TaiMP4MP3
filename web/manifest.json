@@ -1,24 +1,38 @@
 {
   "name": "TaiMP4MP3 - Tải Video TikTok, Facebook, YouTube",
   "short_name": "TaiMP4MP3",
-  "description": "Ứng dụng tải video và nhạc MP4/MP3 tốc độ cao từ TikTok (không logo), Facebook, YouTube",
+  "description": "Ứng dụng tải video và nhạc MP4/MP3 tốc độ cao từ TikTok (không logo), Facebook, YouTube, hỗ trợ cắt ghép nhiều đoạn",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0f172a",
+  "background_color": "#090d16",
   "theme_color": "#3b82f6",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "icons": [
     {
-      "src": "assets/icon-192.png",
+      "src": "/assets/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "assets/icon-512.png",
+      "src": "/assets/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/assets/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
-  ]
+  ],
+  "categories": ["utilities", "multimedia", "video"]
 }
