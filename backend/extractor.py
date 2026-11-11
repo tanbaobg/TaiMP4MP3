@@ -161,118 +161,118 @@ def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInf
             return None
 
         d = data.get("data", {})
-            title = d.get("title") or "TikTok"
-            safe_title = clean_title(title)
-            author = d.get("author", {}).get("nickname") or d.get("author", {}).get("unique_id") or "TikTok"
-            thumbnail = d.get("cover") or d.get("origin_cover") or ""
-            duration = d.get("duration")
-            duration_val = int(round(float(duration))) if duration is not None else None
+        title = d.get("title") or "TikTok"
+        safe_title = clean_title(title)
+        author = d.get("author", {}).get("nickname") or d.get("author", {}).get("unique_id") or "TikTok"
+        thumbnail = d.get("cover") or d.get("origin_cover") or ""
+        duration = d.get("duration")
+        duration_val = int(round(float(duration))) if duration is not None else None
 
-            images = d.get("images") or []
-            music_url = d.get("music") or ""
-            if music_url.startswith("/"):
-                music_url = f"https://www.tikwm.com{music_url}"
+        images = d.get("images") or []
+        music_url = d.get("music") or ""
+        if music_url.startswith("/"):
+            music_url = f"https://www.tikwm.com{music_url}"
 
-            play_url = d.get("play") or ""
-            if play_url.startswith("/"):
-                play_url = f"https://www.tikwm.com{play_url}"
+        play_url = d.get("play") or ""
+        if play_url.startswith("/"):
+            play_url = f"https://www.tikwm.com{play_url}"
 
-            wmplay_url = d.get("wmplay") or ""
-            if wmplay_url.startswith("/"):
-                wmplay_url = f"https://www.tikwm.com{wmplay_url}"
+        wmplay_url = d.get("wmplay") or ""
+        if wmplay_url.startswith("/"):
+            wmplay_url = f"https://www.tikwm.com{wmplay_url}"
 
-            formats: List[FormatOption] = []
+        formats: List[FormatOption] = []
 
-            # KIỂM TRA: Dạng Album Ảnh (Photo Mode) hay Video thực sự
-            is_photo_mode = bool(images) or ("/photo/" in url.lower()) or ("audio_mp4" in play_url)
+        # KIỂM TRA: Dạng Album Ảnh (Photo Mode) hay Video thực sự
+        is_photo_mode = bool(images) or ("/photo/" in url.lower()) or ("audio_mp4" in play_url)
 
-            if is_photo_mode and images:
-                # 1. Video MP4 (Ghép ảnh và nhạc nền gốc có cả hình và tiếng)
-                first_img = images[0]
-                audio_src = music_url or play_url
-                slideshow_proxy = (
-                    f"{base_api_url}/api/download?url={urllib.parse.quote(first_img)}"
-                    f"&audio_url={urllib.parse.quote(audio_src)}"
-                    f"&title={urllib.parse.quote(safe_title)}"
-                    f"&ext=mp4&is_slideshow=1"
+        if is_photo_mode and images:
+            # 1. Video MP4 (Ghép ảnh và nhạc nền gốc có cả hình và tiếng)
+            first_img = images[0]
+            audio_src = music_url or play_url
+            slideshow_proxy = (
+                f"{base_api_url}/api/download?url={urllib.parse.quote(first_img)}"
+                f"&audio_url={urllib.parse.quote(audio_src)}"
+                f"&title={urllib.parse.quote(safe_title)}"
+                f"&ext=mp4&is_slideshow=1"
+            )
+            formats.append(
+                FormatOption(
+                    id="tiktok-video",
+                    quality="MP4 Video (Có cả hình & tiếng)",
+                    type="video",
+                    ext="mp4",
+                    filesize_str="Chuẩn H.264 HD",
+                    direct_url=slideshow_proxy,
+                    proxy_url=slideshow_proxy,
+                    audio_url=audio_src,
+                    has_audio=True,
+                    watermark=False,
                 )
-                formats.append(
-                    FormatOption(
-                        id="tiktok-video",
-                        quality="MP4 Video (Có cả hình & tiếng)",
-                        type="video",
-                        ext="mp4",
-                        filesize_str="Chuẩn H.264 HD",
-                        direct_url=slideshow_proxy,
-                        proxy_url=slideshow_proxy,
-                        audio_url=audio_src,
-                        has_audio=True,
-                        watermark=False,
-                    )
-                )
+            )
 
-            elif play_url and not ("audio_mp4" in play_url):
-                # Video MP4 bình thường không logo
-                formats.append(
-                    FormatOption(
-                        id="tiktok-nowm",
-                        quality="MP4 Không Logo (Có hình & tiếng)",
-                        type="video",
-                        ext="mp4",
-                        filesize_str=format_filesize(d.get("size")) or "Chuẩn H.264 Nét",
-                        direct_url=play_url,
-                        proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(play_url)}&title={urllib.parse.quote(safe_title)}&ext=mp4",
-                        has_audio=True,
-                        watermark=False,
-                    )
+        elif play_url and not ("audio_mp4" in play_url):
+            # Video MP4 bình thường không logo
+            formats.append(
+                FormatOption(
+                    id="tiktok-nowm",
+                    quality="MP4 Không Logo (Có hình & tiếng)",
+                    type="video",
+                    ext="mp4",
+                    filesize_str=format_filesize(d.get("size")) or "Chuẩn H.264 Nét",
+                    direct_url=play_url,
+                    proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(play_url)}&title={urllib.parse.quote(safe_title)}&ext=mp4",
+                    has_audio=True,
+                    watermark=False,
                 )
-            elif wmplay_url:
-                # Dự phòng nếu bản không logo không có sẵn
-                formats.append(
-                    FormatOption(
-                        id="tiktok-nowm",
-                        quality="MP4 Video (Có hình & tiếng)",
-                        type="video",
-                        ext="mp4",
-                        filesize_str=format_filesize(d.get("wm_size")) or "Chuẩn H.264 Nét",
-                        direct_url=wmplay_url,
-                        proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(wmplay_url)}&title={urllib.parse.quote(safe_title)}&ext=mp4",
-                        has_audio=True,
-                        watermark=True,
-                    )
+            )
+        elif wmplay_url:
+            # Dự phòng nếu bản không logo không có sẵn
+            formats.append(
+                FormatOption(
+                    id="tiktok-nowm",
+                    quality="MP4 Video (Có hình & tiếng)",
+                    type="video",
+                    ext="mp4",
+                    filesize_str=format_filesize(d.get("wm_size")) or "Chuẩn H.264 Nét",
+                    direct_url=wmplay_url,
+                    proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(wmplay_url)}&title={urllib.parse.quote(safe_title)}&ext=mp4",
+                    has_audio=True,
+                    watermark=True,
                 )
+            )
 
-            # Âm thanh gốc MP3
-            audio_track = music_url or (play_url if "audio_mp4" in play_url else "")
-            if audio_track:
-                formats.append(
-                    FormatOption(
-                        id="tiktok-audio",
-                        quality="MP3 Âm thanh gốc (Nhạc nền)",
-                        type="audio",
-                        ext="mp3",
-                        filesize_str="320 kbps",
-                        direct_url=audio_track,
-                        proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(audio_track)}&title={urllib.parse.quote(safe_title)}&ext=mp3",
-                        has_audio=True,
-                        watermark=False,
-                    )
+        # Âm thanh gốc MP3
+        audio_track = music_url or (play_url if "audio_mp4" in play_url else "")
+        if audio_track:
+            formats.append(
+                FormatOption(
+                    id="tiktok-audio",
+                    quality="MP3 Âm thanh gốc (Nhạc nền)",
+                    type="audio",
+                    ext="mp3",
+                    filesize_str="320 kbps",
+                    direct_url=audio_track,
+                    proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(audio_track)}&title={urllib.parse.quote(safe_title)}&ext=mp3",
+                    has_audio=True,
+                    watermark=False,
                 )
+            )
 
-            if formats:
-                return MediaInfo(
-                    url=url,
-                    title=title,
-                    platform="tiktok",
-                    thumbnail=thumbnail or (images[0] if images else ""),
-                    duration_str=format_duration(duration_val),
-                    duration_seconds=duration_val,
-                    author=author,
-                    formats=formats,
-                    images=images,
-                )
-            _last_tiktok_error = f"formats list is empty! images={len(images)}, play_url={play_url[:30] if play_url else 'none'}"
-            return None
+        if formats:
+            return MediaInfo(
+                url=url,
+                title=title,
+                platform="tiktok",
+                thumbnail=thumbnail or (images[0] if images else ""),
+                duration_str=format_duration(duration_val),
+                duration_seconds=duration_val,
+                author=author,
+                formats=formats,
+                images=images,
+            )
+        _last_tiktok_error = f"formats list is empty! images={len(images)}, play_url={play_url[:30] if play_url else 'none'}"
+        return None
     except Exception as e:
         import traceback
         err_msg = f"[ERROR extract_tiktok_direct] {type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
