@@ -1,8 +1,8 @@
 import os
 import urllib.parse
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from pydantic import BaseModel
 import httpx
 import yt_dlp
@@ -13,8 +13,8 @@ except ImportError:
     from .extractor import extract_info, MediaInfo, clean_title
 
 app = FastAPI(
-    title="TaiMP4MP3 Serverless API",
-    description="Vercel Serverless Function trích xuất video từ TikTok, Facebook, YouTube",
+    title="TaiMP4MP3 Serverless",
+    description="Web & API Serverless chạy trên Vercel",
     version="1.0.0",
 )
 
@@ -29,9 +29,61 @@ app.add_middleware(
 class AnalyzeRequest(BaseModel):
     url: str
 
-@app.get("/")
+def find_file(filename: str):
+    base_dir = os.path.dirname(__file__)
+    candidates = [
+        os.path.join(base_dir, "static", filename),
+        os.path.join(base_dir, "..", "public", filename),
+        os.path.join(base_dir, filename),
+        os.path.join("public", filename),
+        os.path.join("web", filename),
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    return None
+
+# --- WEB UI ROUTES ---
+@app.get("/", response_class=HTMLResponse)
+@app.get("/index.html", response_class=HTMLResponse)
+def serve_index():
+    path = find_file("index.html")
+    if path and os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>TaiMP4MP3</h1><p>Vui lòng thử lại sau giây lát...</p>")
+
+@app.get("/style.css")
+def serve_style():
+    path = find_file("style.css")
+    if path and os.path.exists(path):
+        return FileResponse(path, media_type="text/css")
+    return Response(content="", media_type="text/css")
+
+@app.get("/app.js")
+def serve_app_js():
+    path = find_file("app.js")
+    if path and os.path.exists(path):
+        return FileResponse(path, media_type="application/javascript")
+    raise HTTPException(status_code=404, detail="app.js not found")
+
+@app.get("/manifest.json")
+def serve_manifest():
+    path = find_file("manifest.json")
+    if path and os.path.exists(path):
+        return FileResponse(path, media_type="application/manifest+json")
+    raise HTTPException(status_code=404)
+
+@app.get("/sw.js")
+def serve_sw():
+    path = find_file("sw.js")
+    if path and os.path.exists(path):
+        return FileResponse(path, media_type="application/javascript")
+    raise HTTPException(status_code=404)
+
+# --- API ROUTES ---
 @app.get("/api")
-def root():
+def api_status():
     return {
         "app": "TaiMP4MP3 Serverless API",
         "platform": "Vercel",
