@@ -2,7 +2,7 @@ import os
 import urllib.parse
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, RedirectResponse
 from pydantic import BaseModel
 import httpx
 import yt_dlp
@@ -80,6 +80,21 @@ def serve_sw():
     if path and os.path.exists(path):
         return FileResponse(path, media_type="application/javascript")
     raise HTTPException(status_code=404)
+
+@app.get("/taimp4mp3-latest.apk")
+@app.get("/taimp4mp3.apk")
+def download_apk():
+    path = find_file("taimp4mp3-latest.apk") or find_file("taimp4mp3.apk")
+    if path and os.path.exists(path):
+        return FileResponse(
+            path,
+            media_type="application/vnd.android.package-archive",
+            filename="taimp4mp3-latest.apk"
+        )
+    return RedirectResponse(
+        url="https://github.com/tanbaobg/TaiMP4MP3/raw/main/web/taimp4mp3-latest.apk",
+        status_code=302
+    )
 
 # --- API ROUTES ---
 @app.get("/api")
