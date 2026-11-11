@@ -1,26 +1,6 @@
-const CACHE_NAME = 'taimp4mp3-v1.2';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/app.js',
-  '/manifest.json',
-  '/assets/icon-192.png',
-  '/assets/icon-512.png',
-  '/assets/icon-192-maskable.png',
-  '/assets/icon-512-maskable.png',
-  '/assets/apple-touch-icon.png',
-  '/assets/favicon-32.png'
-];
+const CACHE_NAME = 'taimp4mp3-v3.0';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn('PWA Cache pre-fetch warning:', err);
-      });
-    })
-  );
   self.skipWaiting();
 });
 
@@ -28,7 +8,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        keys.map((key) => caches.delete(key))
       );
     })
   );
@@ -36,17 +16,24 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Do not cache API requests or direct download media/apk
   const url = event.request.url;
   if (url.includes('/api/') || url.includes('/trim') || url.includes('.apk') || url.includes('download')) {
     return;
   }
 
+  // Network First strategy: always serve freshest version, fallback to cache if offline
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      return cachedResponse || fetch(event.request).then((response) => {
-        return response;
-      }).catch(() => {
+    fetch(event.request).then((networkResponse) => {
+      if (networkResponse && networkResponse.status === 200 && event.request.method === 'GET') {
+        const responseClone = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseClone);
+        }).catch(() => {});
+      }
+      return networkResponse;
+    }).catch(() => {
+      return caches.match(event.request).then((cached) => {
+        if (cached) return cached;
         if (event.request.mode === 'navigate') {
           return caches.match('/index.html');
         }

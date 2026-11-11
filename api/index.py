@@ -55,7 +55,10 @@ def serve_index():
     path = find_file("index.html")
     if path and os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read())
+            return HTMLResponse(
+                content=f.read(),
+                headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"}
+            )
     return HTMLResponse("<h1>TaiMP4MP3</h1><p>Vui lòng thử lại sau giây lát...</p>")
 
 @app.get("/style.css")

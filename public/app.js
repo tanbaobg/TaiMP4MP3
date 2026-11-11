@@ -1,5 +1,16 @@
 // TaiMP4MP3 Client Application
 document.addEventListener('DOMContentLoaded', () => {
+  // Defensively purge any legacy cached floating callout popup
+  const legacyPopup = document.getElementById('install-callout-toast');
+  if (legacyPopup) legacyPopup.remove();
+
+  // Force service worker update if available
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      for (let r of regs) r.update().catch(() => {});
+    }).catch(() => {});
+  }
+
   // Initialize Lucide icons
   if (window.lucide) {
     window.lucide.createIcons();
