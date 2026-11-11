@@ -188,9 +188,9 @@ async def download_proxy(
         ),
     }
 
-    if "tiktok" in decoded_url or "byteoversea" in decoded_url:
+    if any(k in decoded_url for k in ["tiktok", "byteoversea", "ibytedtos", "tikwm", "musical.ly"]):
         headers["Referer"] = "https://www.tiktok.com/"
-    elif "facebook" in decoded_url or "fbcdn" in decoded_url:
+    elif any(k in decoded_url for k in ["facebook", "fbcdn", "fbsbx"]):
         headers["Referer"] = "https://www.facebook.com/"
 
     client = httpx.AsyncClient(timeout=45.0, follow_redirects=True)

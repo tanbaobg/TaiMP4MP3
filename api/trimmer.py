@@ -41,9 +41,9 @@ def get_stream_headers(url: str) -> str:
     headers = [
         "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     ]
-    if "tiktok" in url or "byteoversea" in url or "ibytedtos" in url:
+    if any(k in url for k in ["tiktok", "byteoversea", "ibytedtos", "tikwm", "musical.ly"]):
         headers.append("Referer: https://www.tiktok.com/")
-    elif "facebook" in url or "fbcdn" in url:
+    elif any(k in url for k in ["facebook", "fbcdn", "fbsbx"]):
         headers.append("Referer: https://www.facebook.com/")
     return "\r\n".join(headers) + "\r\n"
 

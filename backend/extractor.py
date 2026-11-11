@@ -1,5 +1,7 @@
 import re
 import urllib.parse
+import urllib.request
+import json
 from typing import List, Optional, Dict, Any, Union
 from pydantic import BaseModel
 import yt_dlp
@@ -29,11 +31,11 @@ class MediaInfo(BaseModel):
 
 def detect_platform(url: str) -> str:
     url_lower = url.lower()
-    if any(k in url_lower for k in ["tiktok.com", "douyin.com"]):
+    if any(k in url_lower for k in ["tiktok.com", "douyin.com", "vt.tiktok", "vm.tiktok"]):
         return "tiktok"
     elif any(k in url_lower for k in ["youtube.com", "youtu.be"]):
         return "youtube"
-    elif any(k in url_lower for k in ["facebook.com", "fb.watch", "fb.com"]):
+    elif any(k in url_lower for k in ["facebook.com", "fb.watch", "fb.com", "fb.gg"]):
         return "facebook"
     elif "instagram.com" in url_lower:
         return "instagram"
@@ -78,15 +80,123 @@ def clean_title(title: str) -> str:
     return cleaned[:80] or "video"
 
 
+def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInfo]:
+    """Bóc tách link video và nhạc TikTok không logo tốc độ cao qua TikWM API."""
+    try:
+        api_url = f"https://www.tikwm.com/api/?url={urllib.parse.quote(url)}"
+        req = urllib.request.Request(
+            api_url,
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/124.0.0.0 Safari/537.36"
+                ),
+                "Accept": "application/json",
+            }
+        )
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        if data.get("code") == 0:
+            d = data.get("data", {})
+            title = d.get("title") or "Video TikTok không logo"
+            safe_title = clean_title(title)
+            author = d.get("author", {}).get("nickname") or d.get("author", {}).get("unique_id") or "TikTok"
+            thumbnail = d.get("cover") or d.get("origin_cover") or ""
+            duration = d.get("duration")
+            duration_val = int(round(float(duration))) if duration is not None else None
+
+            play_url = d.get("play") or ""
+            if play_url.startswith("/"):
+                play_url = f"https://www.tikwm.com{play_url}"
+
+            hd_play_url = d.get("hdplay") or ""
+            if hd_play_url.startswith("/"):
+                hd_play_url = f"https://www.tikwm.com{hd_play_url}"
+
+            music_url = d.get("music") or ""
+            if music_url.startswith("/"):
+                music_url = f"https://www.tikwm.com{music_url}"
+
+            formats: List[FormatOption] = []
+            if hd_play_url:
+                formats.append(
+                    FormatOption(
+                        id="tiktok-hd-nowm",
+                        quality="MP4 Full HD Không Logo (Có tiếng)",
+                        type="video",
+                        ext="mp4",
+                        filesize_str="Full HD Siêu Nét",
+                        direct_url=hd_play_url,
+                        proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(hd_play_url)}&title={urllib.parse.quote(safe_title)}&ext=mp4",
+                        has_audio=True,
+                        watermark=False,
+                    )
+                )
+
+            if play_url:
+                formats.append(
+                    FormatOption(
+                        id="tiktok-nowm",
+                        quality="MP4 Không Logo (Có tiếng)",
+                        type="video",
+                        ext="mp4",
+                        filesize_str=format_filesize(d.get("size")) or "HD Siêu Nét",
+                        direct_url=play_url,
+                        proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(play_url)}&title={urllib.parse.quote(safe_title)}&ext=mp4",
+                        has_audio=True,
+                        watermark=False,
+                    )
+                )
+
+            if music_url:
+                formats.append(
+                    FormatOption(
+                        id="tiktok-audio",
+                        quality="MP3 Âm thanh gốc (320kbps)",
+                        type="audio",
+                        ext="mp3",
+                        filesize_str="320 kbps",
+                        direct_url=music_url,
+                        proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(music_url)}&title={urllib.parse.quote(safe_title)}&ext=mp3",
+                        has_audio=True,
+                        watermark=False,
+                    )
+                )
+
+            if formats:
+                return MediaInfo(
+                    url=url,
+                    title=title,
+                    platform="tiktok",
+                    thumbnail=thumbnail,
+                    duration_str=format_duration(duration_val),
+                    duration_seconds=duration_val,
+                    author=author,
+                    formats=formats,
+                )
+    except Exception:
+        pass
+    return None
+
+
 def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
     platform = detect_platform(url)
 
+    # 1. Với TikTok: Ưu tiên bóc tách link direct không watermark qua TikWM API
+    if platform == "tiktok":
+        tiktok_res = extract_tiktok_direct(url, base_api_url=base_api_url)
+        if tiktok_res:
+            return tiktok_res
+
+    # 2. Với Facebook, YouTube và các nền tảng khác: Dùng yt-dlp tối ưu có tiếng
     ydl_opts: Dict[str, Any] = {
         "quiet": True,
         "no_warnings": True,
         "skip_download": True,
         "extract_flat": False,
-        "format": "best",
+        "format": "best[vcodec!=none][acodec!=none]/best",
         "socket_timeout": 15,
         "http_headers": {
             "User-Agent": (
@@ -98,10 +208,10 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
         },
     }
 
-    if platform == "tiktok":
-        ydl_opts["http_headers"]["Referer"] = "https://www.tiktok.com/"
-    elif platform == "facebook":
+    if platform == "facebook":
         ydl_opts["http_headers"]["Referer"] = "https://www.facebook.com/"
+    elif platform == "tiktok":
+        ydl_opts["http_headers"]["Referer"] = "https://www.tiktok.com/"
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
@@ -128,28 +238,20 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
     formats: List[FormatOption] = []
     seen_qualities = set()
 
-    # --- 1. TIKTOK ---
+    # --- TIKTOK FALLBACK ---
     if platform == "tiktok":
-        best_video_url = info.get("url")
-        for f in raw_formats:
-            f_url = f.get("url", "")
-            if not f_url:
-                continue
-            is_audio = f.get("vcodec") == "none"
-            if not is_audio:
-                best_video_url = f_url
-                break
-
-        if best_video_url:
+        valid_videos = [f for f in raw_formats if f.get("url") and f.get("vcodec") != "none"]
+        best_v = valid_videos[-1]["url"] if valid_videos else info.get("url")
+        if best_v:
             formats.append(
                 FormatOption(
                     id="tiktok-hd-nowatermark",
-                    quality="MP4 Không Logo (HD)",
+                    quality="MP4 Không Logo (Có tiếng)",
                     type="video",
                     ext="mp4",
                     filesize_str="HD Siêu Nét",
-                    direct_url=best_video_url,
-                    proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(best_video_url)}&title={urllib.parse.quote(safe_title)}&ext=mp4",
+                    direct_url=best_v,
+                    proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(best_v)}&title={urllib.parse.quote(safe_title)}&ext=mp4",
                     has_audio=True,
                     watermark=False,
                 )
@@ -173,38 +275,55 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
                 )
                 break
 
-    # --- 2. FACEBOOK ---
+    # --- FACEBOOK (CHỈ LẤY CÁC ĐỊNH DẠNG CÓ ĐẦY ĐỦ TIẾNG & HÌNH) ---
     elif platform == "facebook":
-        for f in reversed(raw_formats):
-            f_url = f.get("url", "")
+        # Lọc bỏ hoàn toàn các stream DASH video bị câm (acodec == 'none')
+        valid_videos = []
+        for f in raw_formats:
+            f_url = f.get("url")
             if not f_url:
                 continue
-            f_id = str(f.get("format_id", ""))
+            v = f.get("vcodec")
+            a = f.get("acodec")
+            # Phải có hình và KHÔNG ĐƯỢC câm tiếng
+            if v == "none" or a == "none":
+                continue
+            valid_videos.append(f)
+
+        for f in valid_videos:
+            f_id = str(f.get("format_id", "")).lower()
             f_note = str(f.get("format_note", "")).upper()
             height = f.get("height") or 0
 
-            quality_label = "HD" if ("HD" in f_id or "HD" in f_note or height >= 720) else "SD"
-            if quality_label not in seen_qualities:
-                seen_qualities.add(quality_label)
+            is_hd = ("hd" in f_id or "hd" in f_note or height >= 720)
+            q_id = "fb-hd" if is_hd else "fb-sd"
+            q_label = "MP4 HD (Có tiếng)" if is_hd else "MP4 SD (Có tiếng)"
+
+            if q_id not in seen_qualities:
+                seen_qualities.add(q_id)
                 size_str = format_filesize(f.get("filesize") or f.get("filesize_approx"))
                 formats.append(
                     FormatOption(
-                        id=f"fb-{quality_label.lower()}",
-                        quality=f"MP4 {quality_label} ({height}p)" if height else f"MP4 {quality_label}",
+                        id=q_id,
+                        quality=q_label,
                         type="video",
                         ext="mp4",
-                        filesize_str=size_str or "Chuẩn HD",
-                        direct_url=f_url,
-                        proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(f_url)}&title={urllib.parse.quote(safe_title)}&ext=mp4",
+                        filesize_str=size_str or ("Chuẩn HD" if is_hd else "Chuẩn SD"),
+                        direct_url=f["url"],
+                        proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(f['url'])}&title={urllib.parse.quote(safe_title)}&ext=mp4",
                         has_audio=True,
                     )
                 )
 
+        # Sắp xếp để HD đứng trước
+        formats.sort(key=lambda x: (0 if "hd" in x.id else 1))
+
+        # Nếu không có định dạng video nào vượt qua bộ lọc nhưng info.get("url") có
         if not formats and info.get("url"):
             formats.append(
                 FormatOption(
                     id="fb-best",
-                    quality="MP4 Video HD",
+                    quality="MP4 Video HD (Có tiếng)",
                     type="video",
                     ext="mp4",
                     filesize_str="Chuẩn HD",
@@ -214,21 +333,25 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
                 )
             )
 
+        # Âm thanh MP3
         direct_audio = next((f["url"] for f in raw_formats if f.get("vcodec") == "none" and f.get("url")), None)
+        if not direct_audio and valid_videos:
+            direct_audio = valid_videos[0]["url"]
         if direct_audio:
             formats.append(
                 FormatOption(
                     id="fb-audio-mp3",
-                    quality="MP3 Âm thanh",
+                    quality="MP3 Âm thanh (Nhạc gốc)",
                     type="audio",
                     ext="mp3",
-                    filesize_str="Chất lượng tốt",
+                    filesize_str="Chất lượng cao",
                     direct_url=direct_audio,
                     proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(direct_audio)}&title={urllib.parse.quote(safe_title)}&ext=mp3",
+                    has_audio=True,
                 )
             )
 
-    # --- 3. YOUTUBE & OTHERS ---
+    # --- YOUTUBE & NỀN TẢNG KHÁC (CHỈ LẤY CÁC ĐỊNH DẠNG CÓ CẢ VIDEO VÀ AUDIO) ---
     else:
         progressive_formats = [
             f for f in raw_formats
@@ -244,13 +367,14 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
             if q_key not in seen_qualities and height in [1080, 720, 480, 360, 240]:
                 seen_qualities.add(q_key)
                 size_str = format_filesize(f.get("filesize") or f.get("filesize_approx"))
+                quality_title = f"MP4 {height}p (Có tiếng)"
                 formats.append(
                     FormatOption(
                         id=f"yt-{height}p",
-                        quality=f"MP4 {height}p {'(Full HD)' if height >= 1080 else '(HD)' if height >= 720 else '(SD)'}",
+                        quality=quality_title,
                         type="video",
                         ext="mp4",
-                        filesize_str=size_str,
+                        filesize_str=size_str or "Độ nét cao",
                         direct_url=f["url"],
                         proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(f['url'])}&title={urllib.parse.quote(safe_title)}&ext=mp4",
                         has_audio=True,
@@ -261,7 +385,7 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
             formats.append(
                 FormatOption(
                     id="best-video",
-                    quality="MP4 Tốt nhất (Mặc định)",
+                    quality="MP4 Tốt nhất (Có tiếng)",
                     type="video",
                     ext="mp4",
                     filesize_str="Tối ưu",
@@ -271,6 +395,7 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
                 )
             )
 
+        # Audio formats
         audio_formats = [
             f for f in raw_formats
             if f.get("url") and f.get("vcodec") == "none"

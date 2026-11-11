@@ -97,14 +97,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Platform Detection Utility ---
   function detectPlatform(url) {
     const val = url.toLowerCase();
-    if (val.includes('tiktok.com') || val.includes('douyin.com')) {
-      return { name: 'TikTok', color: 'pink', badge: 'TikTok Không Logo' };
+    if (val.includes('tiktok.com') || val.includes('douyin.com') || val.includes('vt.tiktok') || val.includes('vm.tiktok')) {
+      return { name: 'TikTok', color: 'pink', badge: 'TikTok Không Logo (Có tiếng)' };
     }
     if (val.includes('youtube.com') || val.includes('youtu.be')) {
-      return { name: 'YouTube', color: 'red', badge: 'YouTube MP4/MP3' };
+      return { name: 'YouTube', color: 'red', badge: 'YouTube MP4/MP3 (Có tiếng)' };
     }
-    if (val.includes('facebook.com') || val.includes('fb.watch') || val.includes('fb.com')) {
-      return { name: 'Facebook', color: 'blue', badge: 'Facebook Full HD' };
+    if (val.includes('facebook.com') || val.includes('fb.watch') || val.includes('fb.com') || val.includes('fb.gg')) {
+      return { name: 'Facebook', color: 'blue', badge: 'Facebook Full HD (Có tiếng)' };
     }
     if (val.includes('instagram.com')) {
       return { name: 'Instagram', color: 'purple', badge: 'Instagram Video' };
