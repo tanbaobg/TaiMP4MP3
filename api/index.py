@@ -152,6 +152,15 @@ async def debug_tiktok(url: str = "https://www.tiktok.com/@nv_ptq/photo/72782911
         result["traceback"] = traceback.format_exc()
     
     try:
+        direct_info = extract_tiktok_direct(url, base_api_url="https://taimp4mp3.vercel.app")
+        result["direct_info_is_none"] = (direct_info is None)
+        if direct_info:
+            result["direct_formats"] = [{"id": f.id, "type": f.type, "quality": f.quality} for f in direct_info.formats]
+    except Exception as e:
+        result["direct_error"] = str(e)
+        result["direct_tb"] = traceback.format_exc()
+
+    try:
         media_info = extract_info(url, base_api_url="https://taimp4mp3.vercel.app")
         result["extract_info_success"] = media_info is not None
         if media_info:
