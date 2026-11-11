@@ -1,6 +1,6 @@
 import re
 import urllib.parse
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from pydantic import BaseModel
 import yt_dlp
 
@@ -22,7 +22,7 @@ class MediaInfo(BaseModel):
     platform: str  # "tiktok", "youtube", "facebook", "other"
     thumbnail: Optional[str] = None
     duration_str: Optional[str] = None
-    duration_seconds: Optional[int] = None
+    duration_seconds: Optional[Union[int, float]] = None
     author: Optional[str] = None
     formats: List[FormatOption] = []
 
@@ -42,29 +42,40 @@ def detect_platform(url: str) -> str:
     return "other"
 
 
-def format_duration(seconds: Optional[int]) -> str:
+def format_duration(seconds: Any) -> str:
     if not seconds:
         return ""
-    m, s = divmod(seconds, 60)
-    h, m = divmod(m, 60)
-    if h > 0:
-        return f"{h}:{m:02d}:{s:02d}"
-    return f"{m:02d}:{s:02d}"
-
-
-def format_filesize(bytes_val: Optional[int]) -> str:
-    if not bytes_val or bytes_val <= 0:
+    try:
+        sec_int = int(round(float(seconds)))
+        m, s = divmod(sec_int, 60)
+        h, m = divmod(m, 60)
+        if h > 0:
+            return f"{h}:{m:02d}:{s:02d}"
+        return f"{m:02d}:{s:02d}"
+    except Exception:
         return ""
-    mb = bytes_val / (1024 * 1024)
-    if mb >= 1024:
-        return f"{mb / 1024:.1f} GB"
-    return f"{mb:.1f} MB"
+
+
+def format_filesize(bytes_val: Any) -> str:
+    if not bytes_val:
+        return ""
+    try:
+        val = float(bytes_val)
+        if val <= 0:
+            return ""
+        mb = val / (1024 * 1024)
+        if mb >= 1024:
+            return f"{mb / 1024:.1f} GB"
+        return f"{mb:.1f} MB"
+    except Exception:
+        return ""
 
 
 def clean_title(title: str) -> str:
-    # Remove filesystem illegal characters
-    cleaned = re.sub(r'[\\/*?:"<>|]', "", title)
-    return cleaned.strip()[:100] or "video"
+    cleaned = title.replace("\n", " ").replace("\r", " ")
+    cleaned = re.sub(r'[\\/*?:"<>|]', "", cleaned)
+    cleaned = re.sub(r'\s+', " ", cleaned).strip()
+    return cleaned[:80] or "video"
 
 
 def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
@@ -87,7 +98,6 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
         },
     }
 
-    # Custom tweaks per platform
     if platform == "tiktok":
         ydl_opts["http_headers"]["Referer"] = "https://www.tiktok.com/"
     elif platform == "facebook":
@@ -96,27 +106,31 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             info = ydl.extract_info(url, download=False)
-        except Exception as e:
-            # Fallback retry with generic extractor if platform extraction failed
+        except Exception:
             ydl_opts["extractor_args"] = {"youtube": {"player_client": ["android", "web"]}}
             with yt_dlp.YoutubeDL(ydl_opts) as fallback_ydl:
                 info = fallback_ydl.extract_info(url, download=False)
 
-    title = info.get("title") or "Video không tiêu đề"
+    title = info.get("title") or info.get("description") or "Video không tiêu đề"
     safe_title = clean_title(title)
     thumbnail = info.get("thumbnail") or ""
     duration = info.get("duration")
+    duration_val = None
+    if duration is not None:
+        try:
+            duration_val = int(round(float(duration)))
+        except Exception:
+            duration_val = None
+
     author = info.get("uploader") or info.get("channel") or info.get("creator") or platform.capitalize()
 
     raw_formats = info.get("formats", [])
     formats: List[FormatOption] = []
     seen_qualities = set()
 
-    # --- 1. SPECIAL CASE: TIKTOK ---
+    # --- 1. TIKTOK ---
     if platform == "tiktok":
-        # Video without watermark
         best_video_url = info.get("url")
-        # Check formats for watermark vs no-watermark
         for f in raw_formats:
             f_url = f.get("url", "")
             if not f_url:
@@ -141,7 +155,6 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
                 )
             )
 
-        # Audio track
         for f in raw_formats:
             f_url = f.get("url", "")
             if f.get("vcodec") == "none" and f_url:
@@ -160,7 +173,7 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
                 )
                 break
 
-    # --- 2. SPECIAL CASE: FACEBOOK ---
+    # --- 2. FACEBOOK ---
     elif platform == "facebook":
         for f in reversed(raw_formats):
             f_url = f.get("url", "")
@@ -187,7 +200,20 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
                     )
                 )
 
-        # Also extract audio option
+        if not formats and info.get("url"):
+            formats.append(
+                FormatOption(
+                    id="fb-best",
+                    quality="MP4 Video HD",
+                    type="video",
+                    ext="mp4",
+                    filesize_str="Chuẩn HD",
+                    direct_url=info.get("url"),
+                    proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(info['url'])}&title={urllib.parse.quote(safe_title)}&ext=mp4",
+                    has_audio=True,
+                )
+            )
+
         direct_audio = next((f["url"] for f in raw_formats if f.get("vcodec") == "none" and f.get("url")), None)
         if direct_audio:
             formats.append(
@@ -202,15 +228,12 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
                 )
             )
 
-    # --- 3. SPECIAL CASE: YOUTUBE & GENERAL PLATFORMS ---
+    # --- 3. YOUTUBE & OTHERS ---
     else:
-        # Standard progressive formats (video + audio in one stream, e.g. 720p, 360p, 1080p)
         progressive_formats = [
             f for f in raw_formats
             if f.get("url") and f.get("vcodec") != "none" and f.get("acodec") != "none"
         ]
-
-        # Sort progressive formats by height descending
         progressive_formats.sort(key=lambda x: (x.get("height") or 0), reverse=True)
 
         for f in progressive_formats:
@@ -234,7 +257,6 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
                     )
                 )
 
-        # If no combined streams found, take best available format
         if not formats and info.get("url"):
             formats.append(
                 FormatOption(
@@ -249,7 +271,6 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
                 )
             )
 
-        # High Quality Audio / MP3 extraction
         audio_formats = [
             f for f in raw_formats
             if f.get("url") and f.get("vcodec") == "none"
@@ -278,8 +299,8 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
         title=title,
         platform=platform,
         thumbnail=thumbnail,
-        duration_str=format_duration(duration),
-        duration_seconds=duration,
+        duration_str=format_duration(duration_val),
+        duration_seconds=duration_val,
         author=author,
         formats=formats,
     )
