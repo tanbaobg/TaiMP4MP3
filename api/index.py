@@ -11,10 +11,10 @@ import httpx
 import yt_dlp
 
 try:
-    from extractor import extract_info, MediaInfo, clean_title
+    from extractor import extract_info, extract_tiktok_direct, MediaInfo, clean_title
     from trimmer import get_ffmpeg_path, parse_time, format_time_code, get_stream_headers, calculate_kept_intervals
 except ImportError:
-    from .extractor import extract_info, MediaInfo, clean_title
+    from .extractor import extract_info, extract_tiktok_direct, MediaInfo, clean_title
     from .trimmer import get_ffmpeg_path, parse_time, format_time_code, get_stream_headers, calculate_kept_intervals
 
 app = FastAPI(
@@ -152,11 +152,11 @@ async def debug_tiktok(url: str = "https://www.tiktok.com/@nv_ptq/photo/72782911
         result["traceback"] = traceback.format_exc()
     
     try:
-        media_info = extract_tiktok_direct(url, base_api_url="https://taimp4mp3.vercel.app")
-        result["extract_tiktok_direct_success"] = media_info is not None
+        media_info = extract_info(url, base_api_url="https://taimp4mp3.vercel.app")
+        result["extract_info_success"] = media_info is not None
         if media_info:
             result["formats_count"] = len(media_info.formats)
-            result["formats"] = [f.id for f in media_info.formats]
+            result["formats"] = [{"id": f.id, "type": f.type, "quality": f.quality} for f in media_info.formats]
     except Exception as e:
         result["extract_error"] = str(e)
         result["extract_traceback"] = traceback.format_exc()

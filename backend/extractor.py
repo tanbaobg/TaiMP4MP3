@@ -260,8 +260,9 @@ def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInf
                     formats=formats,
                     images=images,
                 )
-    except Exception:
-        pass
+    except Exception as e:
+        import traceback
+        print(f"[ERROR extract_tiktok_direct] {e}\n{traceback.format_exc()}")
     return None
 
 
