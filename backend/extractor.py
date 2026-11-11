@@ -156,8 +156,11 @@ def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInf
         with urllib.request.urlopen(req, timeout=12) as resp:
             data = json.loads(resp.read().decode("utf-8"))
 
-        if data.get("code") == 0:
-            d = data.get("data", {})
+        if data.get("code") != 0:
+            _last_tiktok_error = f"TikWM returned code {data.get('code')}: {data.get('msg')}"
+            return None
+
+        d = data.get("data", {})
             title = d.get("title") or "TikTok"
             safe_title = clean_title(title)
             author = d.get("author", {}).get("nickname") or d.get("author", {}).get("unique_id") or "TikTok"
@@ -268,6 +271,8 @@ def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInf
                     formats=formats,
                     images=images,
                 )
+            _last_tiktok_error = f"formats list is empty! images={len(images)}, play_url={play_url[:30] if play_url else 'none'}"
+            return None
     except Exception as e:
         import traceback
         err_msg = f"[ERROR extract_tiktok_direct] {type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
