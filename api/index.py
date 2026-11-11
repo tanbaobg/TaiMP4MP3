@@ -11,10 +11,10 @@ import httpx
 import yt_dlp
 
 try:
-    from extractor import extract_info, extract_tiktok_direct, MediaInfo, clean_title
+    from extractor import extract_info, extract_tiktok_direct, get_last_tiktok_error, MediaInfo, clean_title
     from trimmer import get_ffmpeg_path, parse_time, format_time_code, get_stream_headers, calculate_kept_intervals
 except ImportError:
-    from .extractor import extract_info, extract_tiktok_direct, MediaInfo, clean_title
+    from .extractor import extract_info, extract_tiktok_direct, get_last_tiktok_error, MediaInfo, clean_title
     from .trimmer import get_ffmpeg_path, parse_time, format_time_code, get_stream_headers, calculate_kept_intervals
 
 app = FastAPI(
@@ -147,6 +147,21 @@ async def debug_tiktok(url: str = "https://www.tiktok.com/@nv_ptq/photo/72782911
         result["has_data"] = bool(data.get("data"))
         if data.get("data"):
             result["data_keys"] = list(data.get("data").keys())
+            d = data.get("data", {})
+            title = d.get("title") or "TikTok"
+            safe_title = clean_title(title)
+            author = d.get("author", {}).get("nickname") or d.get("author", {}).get("unique_id") or "TikTok"
+            thumbnail = d.get("cover") or d.get("origin_cover") or ""
+            duration = d.get("duration")
+            duration_val = int(round(float(duration))) if duration is not None else None
+            images = d.get("images") or []
+            music_url = d.get("music") or ""
+            play_url = d.get("play") or ""
+            result["test_step"] = "parsed_vars"
+            result["is_photo_mode"] = bool(images) or ("/photo/" in url.lower()) or ("audio_mp4" in play_url)
+            result["images_count"] = len(images)
+            result["music_url_len"] = len(music_url)
+            result["play_url_len"] = len(play_url)
     except Exception as e:
         result["error"] = str(e)
         result["traceback"] = traceback.format_exc()
@@ -154,6 +169,7 @@ async def debug_tiktok(url: str = "https://www.tiktok.com/@nv_ptq/photo/72782911
     try:
         direct_info = extract_tiktok_direct(url, base_api_url="https://taimp4mp3.vercel.app")
         result["direct_info_is_none"] = (direct_info is None)
+        result["last_tiktok_error"] = get_last_tiktok_error()
         if direct_info:
             result["direct_formats"] = [{"id": f.id, "type": f.type, "quality": f.quality} for f in direct_info.formats]
     except Exception as e:

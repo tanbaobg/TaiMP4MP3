@@ -111,8 +111,16 @@ def get_youtube_cookiejar():
         return None
 
 
+_last_tiktok_error = None
+
+def get_last_tiktok_error():
+    global _last_tiktok_error
+    return _last_tiktok_error
+
 def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInfo]:
     """Bóc tách link video, ảnh và nhạc TikTok không logo tốc độ cao qua TikWM API."""
+    global _last_tiktok_error
+    _last_tiktok_error = None
     try:
         # Xử lý tự động rút gọn link vt.tiktok.com hoặc vm.tiktok.com
         if any(k in url.lower() for k in ["vt.tiktok", "vm.tiktok", "/t/"]):
@@ -262,7 +270,9 @@ def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInf
                 )
     except Exception as e:
         import traceback
-        print(f"[ERROR extract_tiktok_direct] {e}\n{traceback.format_exc()}")
+        err_msg = f"[ERROR extract_tiktok_direct] {type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
+        _last_tiktok_error = err_msg
+        print(err_msg)
     return None
 
 
