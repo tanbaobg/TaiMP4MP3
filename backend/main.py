@@ -1,8 +1,8 @@
 import os
 import urllib.parse
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, HTMLResponse, FileResponse
 from pydantic import BaseModel
 import httpx
 import yt_dlp
@@ -27,8 +27,47 @@ app.add_middleware(
 class AnalyzeRequest(BaseModel):
     url: str
 
-@app.get("/")
+def find_file(filename: str):
+    base_dir = os.path.dirname(__file__)
+    candidates = [
+        os.path.join(base_dir, "static", filename),
+        os.path.join(base_dir, "..", "public", filename),
+        os.path.join(base_dir, "..", "web", filename),
+        os.path.join(base_dir, filename),
+        os.path.join("public", filename),
+        os.path.join("web", filename),
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            return c
+    return None
+
+# --- WEB UI ROUTES ---
+@app.get("/", response_class=HTMLResponse)
+@app.get("/index.html", response_class=HTMLResponse)
 def read_root():
+    path = find_file("index.html")
+    if path and os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse("<h1>TaiMP4MP3</h1><p>Ứng dụng đang khởi động...</p>")
+
+@app.get("/style.css")
+def serve_style():
+    path = find_file("style.css")
+    if path and os.path.exists(path):
+        return FileResponse(path, media_type="text/css")
+    return Response(content="", media_type="text/css")
+
+@app.get("/app.js")
+def serve_app_js():
+    path = find_file("app.js")
+    if path and os.path.exists(path):
+        return FileResponse(path, media_type="application/javascript")
+    raise HTTPException(status_code=404)
+
+@app.get("/api")
+def api_info():
     return {
         "app": "TaiMP4MP3 API Server",
         "status": "online",
@@ -38,6 +77,7 @@ def read_root():
     }
 
 @app.get("/api/health")
+@app.get("/health")
 def health_check():
     return {
         "status": "healthy",
@@ -46,6 +86,7 @@ def health_check():
     }
 
 @app.post("/api/analyze", response_model=MediaInfo)
+@app.post("/analyze", response_model=MediaInfo)
 async def analyze_url(req: AnalyzeRequest, request: Request):
     target_url = req.url.strip()
     if not target_url:
@@ -54,7 +95,6 @@ async def analyze_url(req: AnalyzeRequest, request: Request):
     if not target_url.startswith("http://") and not target_url.startswith("https://"):
         target_url = "https://" + target_url
 
-    # Detect current base API url to construct direct streaming download proxy links
     base_url = str(request.base_url).rstrip("/")
 
     try:
@@ -71,19 +111,16 @@ async def analyze_url(req: AnalyzeRequest, request: Request):
         raise HTTPException(status_code=400, detail=detail)
 
 @app.get("/api/download")
+@app.get("/download")
 async def download_proxy(
     url: str = Query(..., description="Đường dẫn file media trực tiếp"),
     title: str = Query("video", description="Tên file tải về"),
     ext: str = Query("mp4", description="Đuôi định dạng file (mp4, mp3)"),
 ):
-    """
-    Proxy stream tải về: Giúp vượt qua rào cản CORS và giới hạn Referer của TikTok/Facebook CDN
-    """
     decoded_url = urllib.parse.unquote(url)
     safe_name = clean_title(urllib.parse.unquote(title))
     filename = f"{safe_name}.{ext}"
 
-    # Default headers
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -92,7 +129,6 @@ async def download_proxy(
         ),
     }
 
-    # Add appropriate Referer based on target CDN
     if "tiktok" in decoded_url or "byteoversea" in decoded_url or "ibytedtos" in decoded_url:
         headers["Referer"] = "https://www.tiktok.com/"
     elif "fbcdn" in decoded_url or "facebook" in decoded_url:
