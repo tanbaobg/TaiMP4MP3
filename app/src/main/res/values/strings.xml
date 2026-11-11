@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">TaiMP4MP3</string>
+    <string name="download_started">Bắt đầu tải: %1$s</string>
+    <string name="download_completed">Đã tải xong: %1$s</string>
+    <string name="storage_permission_required">Cần cấp quyền bộ nhớ để lưu file video</string>
+</resources>

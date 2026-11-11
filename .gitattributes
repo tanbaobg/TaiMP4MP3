@@ -1,0 +1,4 @@
+# Ensure gradlew has LF line endings for Linux/GitHub Actions
+/gradlew text eol=lf
+*.bat text eol=crlf
+*.sh text eol=lf

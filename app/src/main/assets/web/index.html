@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TaiMP4MP3 - Tải Video TikTok, Facebook, YouTube (MP4/MP3)</title>
+  
+  <!-- Meta SEO -->
+  <meta name="description" content="Tải video TikTok không logo, video Facebook HD, nhạc YouTube MP3 chất lượng cao. Miễn phí, tốc độ cao, hoạt động trên Web và Android.">
+  <meta name="keywords" content="tải video tiktok không logo, tải nhạc youtube mp3, tải video facebook hd, taimp4mp3, download video">
+  <meta name="theme-color" content="#3b82f6">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%233b82f6'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z'/></svg>">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%233b82f6'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z'/></svg>">
+
+  <!-- Tailwind CSS & Lucide Icons -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen relative overflow-x-hidden selection:bg-blue-500 selection:text-white">
+
+  <!-- Background decorative glowing orbs -->
+  <div class="glow-bg"></div>
+
+  <!-- Header -->
+  <header class="sticky top-0 z-40 border-b border-slate-800/80 glass-panel">
+    <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+      <!-- Logo -->
+      <a href="/" class="flex items-center gap-2.5 group">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-pink-500 flex items-center justify-center shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform">
+          <i data-lucide="download" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <span class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 via-indigo-300 to-pink-400 bg-clip-text text-transparent">
+            TaiMP4MP3
+          </span>
+          <span class="hidden sm:inline-block ml-1.5 px-2 py-0.5 text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full">
+            Web & Android
+          </span>
+        </div>
+      </a>
+
+      <!-- Header Actions -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Install PWA button (Dynamic) -->
+        <button id="btn-pwa-install" class="hidden items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 transition-colors">
+          <i data-lucide="smartphone" class="w-4 h-4"></i>
+          <span>Cài Web App</span>
+        </button>
+
+        <!-- Android APK Download link -->
+        <a id="btn-download-apk" href="https://github.com/tanbaobg/TaiMP4MP3/releases" target="_blank" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/30 transition-colors">
+          <i data-lucide="package" class="w-4 h-4"></i>
+          <span>Tải APK</span>
+        </a>
+
+        <!-- History Button -->
+        <button id="btn-open-history" title="Lịch sử tải" class="p-2 rounded-lg bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700/80 transition-colors">
+          <i data-lucide="history" class="w-5 h-5"></i>
+        </button>
+
+        <!-- Settings Button -->
+        <button id="btn-open-settings" title="Cài đặt API" class="p-2 rounded-lg bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700/80 transition-colors">
+          <i data-lucide="settings" class="w-5 h-5"></i>
+        </button>
+
+        <!-- GitHub Repo -->
+        <a href="https://github.com/tanbaobg/TaiMP4MP3" target="_blank" title="GitHub" class="p-2 rounded-lg bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700/80 transition-colors">
+          <i data-lucide="github" class="w-5 h-5"></i>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-4xl mx-auto px-4 py-8 sm:py-12 relative z-10">
+
+    <!-- Hero Section -->
+    <div class="text-center space-y-3 mb-8 sm:mb-10">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-xs font-medium text-slate-300">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+        <span>Hỗ trợ TikTok Không Logo • Facebook HD • YouTube MP3</span>
+      </div>
+      <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight">
+        Tải Video & Âm Thanh <br class="hidden sm:inline">
+        <span class="bg-gradient-to-r from-blue-400 via-indigo-300 to-pink-400 bg-clip-text text-transparent">
+          Tốc Độ Cao Miễn Phí
+        </span>
+      </h1>
+      <p class="text-slate-400 text-sm sm:text-base max-w-xl mx-auto">
+        Chỉ cần dán link video, hệ thống sẽ tự động bóc tách link gốc chất lượng cao nhất (1080p, 720p hoặc MP3) mà không cần cài phần mềm rườm rà.
+      </p>
+
+      <!-- Supported Platforms Badges -->
+      <div class="flex flex-wrap items-center justify-center gap-2 pt-2">
+        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-900 border border-slate-800 flex items-center gap-1.5 text-slate-300">
+          <i data-lucide="video" class="w-3.5 h-3.5 text-pink-500"></i> TikTok Không Logo
+        </span>
+        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-900 border border-slate-800 flex items-center gap-1.5 text-slate-300">
+          <i data-lucide="facebook" class="w-3.5 h-3.5 text-blue-500"></i> Facebook Full HD
+        </span>
+        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-900 border border-slate-800 flex items-center gap-1.5 text-slate-300">
+          <i data-lucide="youtube" class="w-3.5 h-3.5 text-red-500"></i> YouTube MP4/MP3
+        </span>
+        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-900 border border-slate-800 flex items-center gap-1.5 text-slate-300">
+          <i data-lucide="music" class="w-3.5 h-3.5 text-amber-500"></i> Tách Nhạc 320kbps
+        </span>
+      </div>
+    </div>
+
+    <!-- URL Input Card -->
+    <div class="glass-panel rounded-2xl p-3 sm:p-5 shadow-2xl shadow-blue-500/5 mb-8">
+      <form id="form-analyze" class="space-y-3">
+        <div class="relative flex flex-col sm:flex-row items-center gap-2">
+          <!-- Text Input -->
+          <div class="relative w-full">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+              <i data-lucide="link" class="w-5 h-5"></i>
+            </div>
+            <input 
+              type="text" 
+              id="input-url" 
+              placeholder="Dán link video TikTok, Facebook, YouTube vào đây..." 
+              autocomplete="off"
+              spellcheck="false"
+              class="w-full pl-11 pr-24 py-3.5 bg-slate-900/90 text-white placeholder-slate-500 text-sm sm:text-base rounded-xl border border-slate-700/70 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+            >
+            <!-- Clear Button -->
+            <button 
+              type="button" 
+              id="btn-clear-url" 
+              class="hidden absolute inset-y-0 right-12 pr-2 flex items-center text-slate-500 hover:text-slate-300"
+            >
+              <i data-lucide="x-circle" class="w-5 h-5"></i>
+            </button>
+            <!-- Paste Button -->
+            <button 
+              type="button" 
+              id="btn-paste-url" 
+              title="Dán từ bộ nhớ tạm"
+              class="absolute inset-y-0 right-0 pr-3 flex items-center text-xs font-semibold text-blue-400 hover:text-blue-300"
+            >
+              <span class="px-2 py-1 bg-blue-500/10 rounded-md border border-blue-500/20 flex items-center gap-1">
+                <i data-lucide="clipboard-copy" class="w-3.5 h-3.5"></i> Dán
+              </span>
+            </button>
+          </div>
+
+          <!-- Submit Button -->
+          <button 
+            type="submit" 
+            id="btn-submit" 
+            class="w-full sm:w-auto px-6 py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-pink-600 hover:from-blue-500 hover:to-pink-500 text-white font-bold text-sm sm:text-base rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 shrink-0 transition-all hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <i data-lucide="sparkles" class="w-5 h-5"></i>
+            <span>Bắt Đầu Tải</span>
+          </button>
+        </div>
+
+        <!-- Platform Live Indicator -->
+        <div id="platform-indicator" class="hidden text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800">
+          <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+          <span id="platform-text" class="text-slate-300">Phát hiện link: ...</span>
+        </div>
+      </form>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading-spinner" class="hidden py-12 text-center space-y-4">
+      <div class="inline-block spinner"></div>
+      <p class="text-slate-400 text-sm">Đang kết nối và bóc tách định dạng video chất lượng cao...</p>
+    </div>
+
+    <!-- Error Alert -->
+    <div id="error-box" class="hidden p-4 rounded-xl bg-red-950/60 border border-red-500/30 text-red-200 text-sm mb-8 flex items-start gap-3">
+      <i data-lucide="alert-triangle" class="w-5 h-5 text-red-400 shrink-0 mt-0.5"></i>
+      <div class="flex-1" id="error-message">
+        Không thể xử lý liên kết này. Vui lòng kiểm tra lại URL.
+      </div>
+      <button id="btn-close-error" class="text-red-400 hover:text-red-200">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <!-- Result Card -->
+    <div id="result-container" class="hidden space-y-6 mb-12">
+      <div class="glass-panel rounded-2xl p-4 sm:p-6 shadow-xl border border-slate-700/60">
+        
+        <!-- Video Header Info -->
+        <div class="flex flex-col md:flex-row gap-5 items-start">
+          <!-- Thumbnail with duration & preview button -->
+          <div class="relative w-full md:w-56 aspect-video rounded-xl overflow-hidden bg-slate-900 shrink-0 group shadow-md">
+            <img id="res-thumbnail" src="" alt="Thumbnail" class="w-full h-full object-cover">
+            <span id="res-duration" class="absolute bottom-2 right-2 px-1.5 py-0.5 text-[11px] font-semibold bg-black/80 rounded text-white">
+              00:00
+            </span>
+            <button id="btn-preview-media" class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white gap-1.5 font-medium text-xs">
+              <i data-lucide="play-circle" class="w-8 h-8 text-blue-400"></i>
+            </button>
+          </div>
+
+          <!-- Title & Uploader -->
+          <div class="flex-1 space-y-2">
+            <div class="flex items-center gap-2">
+              <span id="res-platform-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                PLATFORM
+              </span>
+              <span id="res-author" class="text-xs text-slate-400 flex items-center gap-1">
+                <i data-lucide="user" class="w-3.5 h-3.5"></i> <span>Kênh</span>
+              </span>
+            </div>
+            <h2 id="res-title" class="text-base sm:text-lg font-bold line-clamp-2 text-white">
+              Tiêu đề video
+            </h2>
+            <p class="text-xs text-slate-400">
+              Chọn định dạng phù hợp bên dưới để tải về máy của bạn:
+            </p>
+          </div>
+        </div>
+
+        <!-- Format Filter Tabs (All / Video MP4 / Audio MP3) -->
+        <div class="mt-6 border-t border-slate-800/80 pt-4">
+          <div class="flex items-center gap-2 mb-4">
+            <button data-filter="all" class="format-tab px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white">
+              Tất cả định dạng
+            </button>
+            <button data-filter="video" class="format-tab px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 hover:text-white">
+              📹 Video MP4
+            </button>
+            <button data-filter="audio" class="format-tab px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 hover:text-white">
+              🎵 Âm thanh MP3
+            </button>
+          </div>
+
+          <!-- Formats Grid -->
+          <div id="formats-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <!-- Dynamic Format Cards injected by app.js -->
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Feature Highlights -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6 border-t border-slate-900">
+      <div class="p-4 rounded-xl glass-card">
+        <div class="w-8 h-8 rounded-lg bg-pink-500/10 text-pink-400 flex items-center justify-center mb-3">
+          <i data-lucide="shield-check" class="w-5 h-5"></i>
+        </div>
+        <h3 class="text-sm font-bold text-white mb-1">TikTok Không Logo</h3>
+        <p class="text-xs text-slate-400">Tự động loại bỏ hình mờ watermark và ID tác giả, giữ độ phân giải gốc siêu nét.</p>
+      </div>
+
+      <div class="p-4 rounded-xl glass-card">
+        <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center mb-3">
+          <i data-lucide="zap" class="w-5 h-5"></i>
+        </div>
+        <h3 class="text-sm font-bold text-white mb-1">Tốc Độ Băng Thông Cao</h3>
+        <p class="text-xs text-slate-400">Hỗ trợ stream tải đa luồng trực tiếp từ CDN, không bóp băng thông, không giới hạn dung lượng.</p>
+      </div>
+
+      <div class="p-4 rounded-xl glass-card">
+        <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-3">
+          <i data-lucide="smartphone" class="w-5 h-5"></i>
+        </div>
+        <h3 class="text-sm font-bold text-white mb-1">Hỗ Trợ Android & Web</h3>
+        <p class="text-xs text-slate-400">Dùng trực tiếp trên trình duyệt Web hoặc cài file APK Android với DownloadManager tích hợp sẵn.</p>
+      </div>
+    </div>
+
+    <!-- FAQ Accordion -->
+    <div class="mt-12 space-y-3">
+      <h3 class="text-lg font-bold text-white mb-4 text-center">Câu Hỏi Thường Gặp</h3>
+      
+      <details class="glass-card rounded-xl p-4 cursor-pointer group">
+        <summary class="text-sm font-semibold text-slate-200 flex items-center justify-between list-none">
+          <span>Làm sao để tải video TikTok không dính logo watermark?</span>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform"></i>
+        </summary>
+        <p class="text-xs text-slate-400 mt-2.5 leading-relaxed">
+          Bạn chỉ cần sao chép link video từ ứng dụng TikTok (bấm nút Chia sẻ -> Sao chép liên kết) rồi dán vào ô tìm kiếm. TaiMP4MP3 sẽ tự động phân tích và cung cấp nút "Tải MP4 Không Logo (HD)".
+        </p>
+      </details>
+
+      <details class="glass-card rounded-xl p-4 cursor-pointer group">
+        <summary class="text-sm font-semibold text-slate-200 flex items-center justify-between list-none">
+          <span>Video Facebook tải về có lưu được chất lượng Full HD không?</span>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform"></i>
+        </summary>
+        <p class="text-xs text-slate-400 mt-2.5 leading-relaxed">
+          Có. Nếu video gốc trên Facebook được tải lên ở định dạng 1080p hoặc 720p HD, hệ thống sẽ tự động bắt luồng chất lượng cao nhất để bạn chọn tải.
+        </p>
+      </details>
+
+      <details class="glass-card rounded-xl p-4 cursor-pointer group">
+        <summary class="text-sm font-semibold text-slate-200 flex items-center justify-between list-none">
+          <span>Cách cài đặt app trên điện thoại Android?</span>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 group-open:rotate-180 transition-transform"></i>
+        </summary>
+        <p class="text-xs text-slate-400 mt-2.5 leading-relaxed">
+          Bạn có thể nhấn vào nút "Tải APK" ở góc trên cùng để tải file cài đặt Android (.apk) trực tiếp về điện thoại, hoặc nhấn "Cài Web App" để thêm vào màn hình chính dạng Progressive Web App.
+        </p>
+      </details>
+    </div>
+
+  </main>
+
+  <!-- Modals & Drawers -->
+
+  <!-- 1. History Modal -->
+  <div id="modal-history" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-lg rounded-2xl p-5 border border-slate-700/80 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <i data-lucide="history" class="w-5 h-5 text-blue-400"></i>
+          <h3 class="text-base font-bold text-white">Lịch sử đã tải</h3>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btn-clear-history" class="text-xs text-rose-400 hover:text-rose-300 font-semibold px-2 py-1 rounded bg-rose-500/10">
+            Xóa hết
+          </button>
+          <button id="btn-close-history" class="p-1 text-slate-400 hover:text-white">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+      <div id="history-list" class="overflow-y-auto space-y-2.5 flex-1 pr-1">
+        <!-- Rendered by app.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Settings Modal (API URL Configuration) -->
+  <div id="modal-settings" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-md rounded-2xl p-5 border border-slate-700/80 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center gap-2">
+          <i data-lucide="settings" class="w-5 h-5 text-blue-400"></i>
+          <h3 class="text-base font-bold text-white">Cấu hình Máy Chủ API</h3>
+        </div>
+        <button id="btn-close-settings" class="p-1 text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Backend API Endpoint:</label>
+          <input 
+            type="text" 
+            id="input-api-url" 
+            placeholder="http://localhost:8000 hoặc URL cloud"
+            class="w-full px-3 py-2 bg-slate-900 text-sm text-white rounded-lg border border-slate-700 focus:outline-none focus:border-blue-500"
+          >
+          <p class="text-[11px] text-slate-400 mt-1">
+            Mặc định kết nối tới Backend FastAPI (Python) chạy trên máy chủ nội bộ hoặc Cloud.
+          </p>
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+          <button id="btn-test-api" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5">
+            <span id="api-status-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+            <span>Kiểm tra kết nối</span>
+          </button>
+          <button id="btn-save-settings" class="px-4 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-500">
+            Lưu cấu hình
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Preview Player Modal -->
+  <div id="modal-preview" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-2xl bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-800 space-y-3">
+      <div class="flex items-center justify-between p-3.5 border-b border-slate-800">
+        <h4 id="preview-title" class="text-sm font-semibold text-white truncate max-w-[80%]">Xem trước video</h4>
+        <button id="btn-close-preview" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-3">
+        <video id="preview-video-player" controls class="w-full aspect-video rounded-lg bg-black"></video>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="mt-16 border-t border-slate-900 py-6 text-center text-xs text-slate-400">
+    <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <p>© 2026 TaiMP4MP3 • Mã nguồn mở trên GitHub.</p>
+      <div class="flex items-center gap-4">
+        <a href="https://github.com/tanbaobg/TaiMP4MP3" target="_blank" class="hover:text-blue-400 transition-colors">GitHub Repository</a>
+        <a href="https://github.com/tanbaobg/TaiMP4MP3/blob/main/LICENSE" target="_blank" class="hover:text-blue-400 transition-colors">MIT License</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- App Logic -->
+  <script src="app.js"></script>
+</body>
+</html>

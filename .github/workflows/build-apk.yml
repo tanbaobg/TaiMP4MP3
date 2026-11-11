@@ -1,0 +1,65 @@
+name: Build TaiMP4MP3 Android APK & Release
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle 8.4
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.4'
+
+      - name: Build Release APK with Gradle
+        run: gradle assembleRelease --stacktrace
+
+      - name: Deploy APK to web folder & auto-commit
+        run: |
+          mkdir -p web
+          cp app/build/outputs/apk/release/app-release.apk web/taimp4mp3-latest.apk
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add web/taimp4mp3-latest.apk
+          git diff --quiet && git diff --staged --quiet || (git commit -m "🚀 Auto-deploy TaiMP4MP3 Release APK to web [skip ci]" && git push)
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TaiMP4MP3-Release-APK
+          path: app/build/outputs/apk/release/app-release.apk
+
+      - name: Create GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          files: app/build/outputs/apk/release/app-release.apk
+          tag_name: v1.0.0
+          name: TaiMP4MP3 Release v1.0.0
+          body: |
+            ### 📱 TaiMP4MP3 - Tải Video TikTok, Facebook, YouTube
+            - Tải video TikTok không logo (Watermark free HD).
+            - Tải video Facebook chuẩn HD/SD.
+            - Tải nhạc và video YouTube (MP4 / MP3 320kbps).
+            - Tích hợp Android DownloadManager trực tiếp vào máy.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
