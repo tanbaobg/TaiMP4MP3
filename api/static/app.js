@@ -1001,7 +1001,85 @@ document.addEventListener('DOMContentLoaded', () => {
     deferredInstallPrompt = null;
     showToast('🎉 TaiMP4MP3 đã được cài đặt vào thiết bị của bạn!');
     if (headerInstallText) headerInstallText.textContent = 'Đã Cài Đặt';
+    dismissCallout();
   });
+
+  // --- 15-Second Installation Callout Pointer ---
+  const installCallout = document.getElementById('install-callout-toast');
+  const btnCloseCallout = document.getElementById('btn-close-callout');
+  const btnCalloutInstall = document.getElementById('btn-callout-install');
+  const installCountdownBadge = document.getElementById('install-countdown-badge');
+  const installTimerProgress = document.getElementById('install-timer-progress');
+
+  let calloutTimer = null;
+  let remainingSeconds = 15;
+
+  function dismissCallout() {
+    if (calloutTimer) {
+      clearInterval(calloutTimer);
+      calloutTimer = null;
+    }
+    if (installCallout) {
+      installCallout.classList.add('opacity-0', '-translate-y-4');
+      setTimeout(() => {
+        installCallout.classList.add('hidden');
+      }, 500);
+    }
+  }
+
+  function startCalloutCountdown() {
+    if (!installCallout || isStandalone) return;
+    if (sessionStorage.getItem('dismiss_install_callout')) return;
+
+    setTimeout(() => {
+      if (isStandalone) return;
+      installCallout.classList.remove('hidden');
+      void installCallout.offsetWidth;
+      installCallout.classList.remove('opacity-0', '-translate-y-4');
+      if (window.lucide) window.lucide.createIcons();
+
+      remainingSeconds = 15;
+      if (installCountdownBadge) installCountdownBadge.textContent = '15s';
+      if (installTimerProgress) installTimerProgress.style.width = '100%';
+
+      calloutTimer = setInterval(() => {
+        remainingSeconds -= 1;
+        if (installCountdownBadge) {
+          installCountdownBadge.textContent = `${remainingSeconds}s`;
+        }
+        if (installTimerProgress) {
+          const pct = Math.max(0, (remainingSeconds / 15) * 100);
+          installTimerProgress.style.width = `${pct}%`;
+        }
+
+        if (remainingSeconds <= 0) {
+          dismissCallout();
+        }
+      }, 1000);
+    }, 1000);
+  }
+
+  if (btnCloseCallout) {
+    btnCloseCallout.addEventListener('click', () => {
+      sessionStorage.setItem('dismiss_install_callout', 'true');
+      dismissCallout();
+    });
+  }
+
+  if (btnCalloutInstall) {
+    btnCalloutInstall.addEventListener('click', () => {
+      dismissCallout();
+      if (deferredInstallPrompt) {
+        triggerBrowserInstall();
+      } else {
+        openInstallModal();
+      }
+    });
+  }
+
+  if (!isStandalone) {
+    startCalloutCountdown();
+  }
 
   if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('/sw.js').catch((err) => {

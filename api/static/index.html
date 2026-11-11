@@ -163,6 +163,70 @@
     </div>
   </header>
 
+  <!-- Floating Installation Arrow & Callout with 15s Countdown -->
+  <div id="install-callout-toast" class="hidden fixed top-[68px] right-2 sm:right-6 md:right-10 z-50 max-w-[340px] sm:max-w-sm w-[calc(100vw-1rem)] transition-all duration-500 ease-out transform -translate-y-4 opacity-0 pointer-events-auto">
+    <!-- Pointing Arrow Indicator (pointing upwards to Header Install button) -->
+    <div class="flex justify-end pr-6 sm:pr-10 mb-[-5px] relative z-10">
+      <div class="flex flex-col items-center animate-bounce">
+        <span class="text-[11px] font-extrabold text-emerald-400 bg-slate-900 px-2.5 py-0.5 rounded-full border border-emerald-500/50 shadow-md flex items-center gap-1">
+          <i data-lucide="arrow-up" class="w-3.5 h-3.5 text-emerald-400 animate-pulse"></i>
+          <span>Bấm cài đặt tại đây</span>
+        </span>
+        <div class="w-2.5 h-2.5 bg-slate-900 border-t border-l border-emerald-500/50 rotate-45 mt-[-3px]"></div>
+      </div>
+    </div>
+
+    <!-- Callout Card -->
+    <div class="glass-panel bg-slate-900/95 backdrop-blur-xl rounded-2xl p-4 border border-blue-500/40 shadow-2xl shadow-blue-500/20 space-y-3 relative overflow-hidden">
+      <!-- Top Shrinking Progress Bar (15s) -->
+      <div class="absolute top-0 left-0 right-0 h-1 bg-slate-800">
+        <div id="install-timer-progress" class="h-full bg-gradient-to-r from-emerald-400 via-blue-500 to-pink-500 transition-all duration-1000 ease-linear" style="width: 100%;"></div>
+      </div>
+
+      <!-- Header with Icon & 15s Countdown Badge -->
+      <div class="flex items-center justify-between pt-1">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-gradient-to-tr from-blue-600 via-indigo-600 to-pink-500 flex items-center justify-center text-white shrink-0 shadow-md">
+            <i data-lucide="download-cloud" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <span class="text-xs font-extrabold text-white block leading-tight">Chưa cài đặt TaiMP4MP3?</span>
+            <span class="text-[10px] text-slate-400">Máy tính & Điện thoại</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+          <!-- Countdown Badge -->
+          <span id="install-countdown-badge" class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-800 text-blue-300 border border-slate-700 shadow-inner">
+            15s
+          </span>
+          <!-- Close Button -->
+          <button type="button" id="btn-close-callout" class="p-1 text-slate-400 hover:text-white rounded-md hover:bg-slate-800 transition-colors" title="Đóng">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <p class="text-[11px] text-slate-300 leading-snug">
+        Cài ứng dụng về máy để mở từ màn hình chính, tải video TikTok/FB/YouTube tốc độ cao và xem trước mượt mà!
+      </p>
+
+      <!-- Quick Action Buttons -->
+      <div class="grid grid-cols-2 gap-2 pt-0.5">
+        <button type="button" id="btn-callout-install" class="py-2 px-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/25 active:scale-95 transition-all">
+          <i data-lucide="download-cloud" class="w-3.5 h-3.5"></i>
+          <span>Cài Đặt Ngay</span>
+        </button>
+
+        <a href="/taimp4mp3-latest.apk" download="taimp4mp3.apk" class="py-2 px-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+          <i data-lucide="package" class="w-3.5 h-3.5"></i>
+          <span>Tải file APK</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
   <!-- Main Content -->
   <main class="max-w-4xl mx-auto px-4 py-8 sm:py-12 relative z-10">
 
