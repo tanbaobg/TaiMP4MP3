@@ -208,8 +208,10 @@ async def download_proxy(
                 await res.aclose()
                 await client.aclose()
 
+        import re
         encoded_filename = urllib.parse.quote(filename)
-        content_disposition = f"attachment; filename*=UTF-8''{encoded_filename}"
+        ascii_fallback = re.sub(r'[^\x20-\x7E]', '_', filename)
+        content_disposition = f'attachment; filename="{ascii_fallback}"; filename*=UTF-8\'\'{encoded_filename}'
 
         return StreamingResponse(
             stream_generator(),

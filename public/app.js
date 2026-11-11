@@ -94,6 +94,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const btnPwaInstall = document.getElementById('btn-pwa-install');
 
+  // Modal Sửa Tên Trước Khi Tải Về
+  const modalRename = document.getElementById('modal-rename-download');
+  const btnCloseRename = document.getElementById('btn-close-rename-modal');
+  const btnCancelRename = document.getElementById('btn-cancel-rename');
+  const btnConfirmDownload = document.getElementById('btn-confirm-download');
+  const inputRenameFilename = document.getElementById('input-rename-filename');
+  const labelRenameExt = document.getElementById('label-rename-ext');
+  const renameBadgeIcon = document.getElementById('rename-badge-icon');
+  const renameBadgeQuality = document.getElementById('rename-badge-quality');
+  const renameBadgeExt = document.getElementById('rename-badge-ext');
+  const renameBadgeSize = document.getElementById('rename-badge-size');
+  let currentPendingDownload = null;
+
   // --- Platform Detection Utility ---
   function detectPlatform(url) {
     const val = url.toLowerCase();
@@ -414,14 +427,14 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // --- Trigger Multi-Segment Download (MP4 / MP3) ---
-  async function triggerTrimDownload(mediaType) {
+  async function triggerTrimDownload(mediaType, customTitle = '') {
     if (!currentMediaData || !currentDirectStreamUrl) {
       showError('Không tìm thấy nguồn video hợp lệ để cắt');
       return;
     }
 
     trimLoading.classList.remove('hidden');
-    const safeTitle = currentMediaData.title || 'video';
+    const safeTitle = customTitle || (currentMediaData.title ? sanitizeFilename(currentMediaData.title) : 'video');
     const totalDuration = currentMediaData.duration_seconds || inlineVideoPlayer.duration || 60;
 
     // Clean segments array
@@ -437,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const dlLink = document.createElement('a');
     dlLink.href = trimApiUrl;
-    dlLink.setAttribute('download', '');
+    dlLink.setAttribute('download', `${safeTitle}.${mediaType === 'video' ? 'mp4' : 'mp3'}`);
     document.body.appendChild(dlLink);
     dlLink.click();
     dlLink.remove();
@@ -448,8 +461,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 4500);
   }
 
-  btnDownloadTrimMp4.addEventListener('click', () => triggerTrimDownload('video'));
-  btnDownloadTrimMp3.addEventListener('click', () => triggerTrimDownload('audio'));
+  btnDownloadTrimMp4.addEventListener('click', () => {
+    if (!currentMediaData || !currentDirectStreamUrl) {
+      showError('Không tìm thấy nguồn video để cắt');
+      return;
+    }
+    const defaultName = `${currentMediaData.title || 'video'}_${trimMode === 'keep' ? 'lay' : 'bo'}_${segments.length}doan`;
+    openRenameDialog({
+      rawTitle: defaultName,
+      ext: 'mp4',
+      quality: `Video MP4 Cắt Ghép (${segments.length} đoạn)`,
+      filesize_str: `${segments.length} đoạn`,
+      isTrim: true,
+      mediaType: 'video'
+    });
+  });
+
+  btnDownloadTrimMp3.addEventListener('click', () => {
+    if (!currentMediaData || !currentDirectStreamUrl) {
+      showError('Không tìm thấy nguồn audio để cắt');
+      return;
+    }
+    const defaultName = `${currentMediaData.title || 'audio'}_${trimMode === 'keep' ? 'lay' : 'bo'}_${segments.length}doan`;
+    openRenameDialog({
+      rawTitle: defaultName,
+      ext: 'mp3',
+      quality: `Âm Thanh MP3 Cắt Ghép (${segments.length} đoạn)`,
+      filesize_str: `${segments.length} đoạn`,
+      isTrim: true,
+      mediaType: 'audio'
+    });
+  });
 
   // --- Form Submit (Analyze Media) ---
   form.addEventListener('submit', async (e) => {
@@ -651,16 +693,18 @@ document.addEventListener('DOMContentLoaded', () => {
             <i data-lucide="copy" class="w-4 h-4"></i>
           </button>
 
-          <a 
-            href="${targetDownloadUrl}" 
-            target="_blank" 
-            rel="noopener noreferrer" 
-            download="${currentMediaData.title}.${fmt.ext}"
-            class="px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 shadow-md shadow-blue-500/20 transition-transform active:scale-95"
+          <button 
+            type="button" 
+            data-url="${targetDownloadUrl}" 
+            data-title="${encodeURIComponent(currentMediaData.title || 'video')}"
+            data-ext="${fmt.ext}"
+            data-quality="${encodeURIComponent(fmt.quality)}"
+            data-size="${fmt.filesize_str || ''}"
+            class="btn-trigger-download px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 shadow-md shadow-blue-500/20 transition-transform active:scale-95"
           >
             <i data-lucide="download" class="w-3.5 h-3.5"></i>
             <span>Tải về</span>
-          </a>
+          </button>
         </div>
       `;
 
@@ -680,7 +724,128 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     });
+
+    // Mở hộp thoại sửa tên trước khi tải về
+    document.querySelectorAll('.btn-trigger-download').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const url = btn.getAttribute('data-url');
+        const rawTitle = decodeURIComponent(btn.getAttribute('data-title') || 'video');
+        const ext = btn.getAttribute('data-ext') || 'mp4';
+        const quality = decodeURIComponent(btn.getAttribute('data-quality') || 'Video');
+        const size = btn.getAttribute('data-size') || '';
+
+        openRenameDialog({
+          url: url,
+          rawTitle: rawTitle,
+          ext: ext,
+          quality: quality,
+          filesize_str: size,
+          isTrim: false
+        });
+      });
+    });
   }
+
+  // --- Hộp Thoại Sửa Tên & Tải Xuống (Rename Download Modal) ---
+  function sanitizeFilename(name) {
+    if (!name) return 'video';
+    return name
+      .replace(/[\n\r]+/g, ' ')
+      .replace(/[\\/*?:"<>|]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .substring(0, 100) || 'video';
+  }
+
+  function openRenameDialog(options) {
+    currentPendingDownload = options;
+
+    const baseName = sanitizeFilename(options.rawTitle);
+    inputRenameFilename.value = baseName;
+    labelRenameExt.textContent = `.${options.ext}`;
+    renameBadgeExt.textContent = options.ext;
+    renameBadgeQuality.textContent = options.quality || 'Chất lượng cao';
+    renameBadgeSize.textContent = options.filesize_str ? `• ${options.filesize_str}` : '• Tốc độ cao';
+
+    if (options.ext === 'mp3') {
+      renameBadgeIcon.innerHTML = '<i data-lucide="music" class="w-5 h-5 text-amber-400"></i>';
+      renameBadgeIcon.className = 'w-10 h-10 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0';
+    } else {
+      renameBadgeIcon.innerHTML = '<i data-lucide="video" class="w-5 h-5 text-blue-400"></i>';
+      renameBadgeIcon.className = 'w-10 h-10 rounded-lg bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0';
+    }
+
+    if (window.lucide) {
+      window.lucide.createIcons();
+    }
+
+    modalRename.classList.remove('hidden');
+
+    setTimeout(() => {
+      inputRenameFilename.focus();
+      inputRenameFilename.select();
+    }, 60);
+  }
+
+  function closeRenameDialog() {
+    modalRename.classList.add('hidden');
+    currentPendingDownload = null;
+  }
+
+  btnCloseRename.addEventListener('click', closeRenameDialog);
+  btnCancelRename.addEventListener('click', closeRenameDialog);
+  modalRename.addEventListener('click', (e) => {
+    if (e.target === modalRename) closeRenameDialog();
+  });
+
+  inputRenameFilename.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      btnConfirmDownload.click();
+    } else if (e.key === 'Escape') {
+      closeRenameDialog();
+    }
+  });
+
+  btnConfirmDownload.addEventListener('click', () => {
+    if (!currentPendingDownload) return;
+
+    const customName = sanitizeFilename(inputRenameFilename.value.trim());
+    const ext = currentPendingDownload.ext;
+    const fullFilename = `${customName}.${ext}`;
+
+    if (currentPendingDownload.isTrim) {
+      closeRenameDialog();
+      triggerTrimDownload(currentPendingDownload.mediaType, customName);
+      return;
+    }
+
+    // Tải về định dạng thông thường
+    let finalDownloadUrl = currentPendingDownload.url;
+    try {
+      if (finalDownloadUrl.includes('/api/download')) {
+        const u = new URL(finalDownloadUrl, window.location.origin);
+        u.searchParams.set('title', customName);
+        finalDownloadUrl = u.toString();
+      } else {
+        finalDownloadUrl = `${currentApiBase.replace(/\/$/, '')}/api/download?url=${encodeURIComponent(finalDownloadUrl)}&title=${encodeURIComponent(customName)}&ext=${ext}`;
+      }
+    } catch {
+      // Giữ nguyên URL nếu lỗi parse
+    }
+
+    closeRenameDialog();
+    showNotification(`Đang bắt đầu tải về: ${fullFilename}`);
+
+    const a = document.createElement('a');
+    a.href = finalDownloadUrl;
+    a.download = fullFilename;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => a.remove(), 120);
+  });
 
   // --- Preview Player Modal (Secondary) ---
   btnPreviewMedia.addEventListener('click', () => {

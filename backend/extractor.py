@@ -120,29 +120,15 @@ def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInf
                 music_url = f"https://www.tikwm.com{music_url}"
 
             formats: List[FormatOption] = []
-            if hd_play_url:
-                formats.append(
-                    FormatOption(
-                        id="tiktok-hd-nowm",
-                        quality="MP4 Full HD Không Logo (Có tiếng)",
-                        type="video",
-                        ext="mp4",
-                        filesize_str="Full HD Siêu Nét",
-                        direct_url=hd_play_url,
-                        proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(hd_play_url)}&title={urllib.parse.quote(safe_title)}&ext=mp4",
-                        has_audio=True,
-                        watermark=False,
-                    )
-                )
-
+            # 1. Định dạng chuẩn H.264 không logo (Bắt buộc đứng đầu để trình xem trước và nút tải mặc định có 100% hình & tiếng)
             if play_url:
                 formats.append(
                     FormatOption(
                         id="tiktok-nowm",
-                        quality="MP4 Không Logo (Có tiếng)",
+                        quality="MP4 Không Logo (Có hình & tiếng)",
                         type="video",
                         ext="mp4",
-                        filesize_str=format_filesize(d.get("size")) or "HD Siêu Nét",
+                        filesize_str=format_filesize(d.get("size")) or "Chuẩn H.264 Nét",
                         direct_url=play_url,
                         proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(play_url)}&title={urllib.parse.quote(safe_title)}&ext=mp4",
                         has_audio=True,
@@ -150,6 +136,7 @@ def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInf
                     )
                 )
 
+            # 2. Âm thanh gốc MP3
             if music_url:
                 formats.append(
                     FormatOption(
@@ -160,6 +147,22 @@ def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInf
                         filesize_str="320 kbps",
                         direct_url=music_url,
                         proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(music_url)}&title={urllib.parse.quote(safe_title)}&ext=mp3",
+                        has_audio=True,
+                        watermark=False,
+                    )
+                )
+
+            # 3. Định dạng Full HD (nếu có, đặt sau bản H.264 chuẩn)
+            if hd_play_url:
+                formats.append(
+                    FormatOption(
+                        id="tiktok-hd-nowm",
+                        quality="MP4 Full HD Không Logo (1080p)",
+                        type="video",
+                        ext="mp4",
+                        filesize_str="Full HD Siêu Nét",
+                        direct_url=hd_play_url,
+                        proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(hd_play_url)}&title={urllib.parse.quote(safe_title)}&ext=mp4",
                         has_audio=True,
                         watermark=False,
                     )
@@ -212,12 +215,27 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
         ydl_opts["http_headers"]["Referer"] = "https://www.facebook.com/"
     elif platform == "tiktok":
         ydl_opts["http_headers"]["Referer"] = "https://www.tiktok.com/"
+        ydl_opts["format"] = "best[vcodec^=avc1][acodec!=none]/best[vcodec^=h264][acodec!=none]/best[acodec!=none][vcodec!=none]/best"
+    elif platform == "youtube":
+        ydl_opts["extractor_args"] = {
+            "youtube": {
+                "player_client": ["android"],
+                "player_skip": ["webpage", "configs"],
+            }
+        }
+        ydl_opts["format"] = "best[vcodec!=none][acodec!=none]/best"
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             info = ydl.extract_info(url, download=False)
         except Exception:
-            ydl_opts["extractor_args"] = {"youtube": {"player_client": ["android", "web"]}}
+            if platform == "youtube":
+                ydl_opts["extractor_args"] = {
+                    "youtube": {
+                        "player_client": ["android_vr", "android"],
+                        "player_skip": ["webpage", "configs"],
+                    }
+                }
             with yt_dlp.YoutubeDL(ydl_opts) as fallback_ydl:
                 info = fallback_ydl.extract_info(url, download=False)
 
@@ -240,16 +258,38 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
 
     # --- TIKTOK FALLBACK ---
     if platform == "tiktok":
-        valid_videos = [f for f in raw_formats if f.get("url") and f.get("vcodec") != "none"]
-        best_v = valid_videos[-1]["url"] if valid_videos else info.get("url")
+        valid_videos = []
+        for f in raw_formats:
+            f_url = f.get("url")
+            vcodec = str(f.get("vcodec", "")).lower()
+            acodec = str(f.get("acodec", "")).lower()
+            fmt_id = str(f.get("format_id", "")).lower()
+            if not f_url or vcodec == "none" or acodec == "none":
+                continue
+            # Tuyệt đối loại bỏ ByteVC1 / H.265 để đảm bảo video luôn có hình trên mọi trình duyệt & thiết bị
+            if "bytevc1" in fmt_id or "bytevc1" in vcodec or "h265" in vcodec or "hevc" in vcodec:
+                continue
+            valid_videos.append(f)
+
+        best_v = valid_videos[-1]["url"] if valid_videos else None
+        if not best_v:
+            # Tìm bất kỳ định dạng h264 nào có url
+            h264_fmts = [f for f in raw_formats if f.get("url") and "h264" in str(f.get("format_id", "")).lower()]
+            if h264_fmts:
+                best_v = h264_fmts[-1]["url"]
+            elif raw_formats:
+                best_v = raw_formats[0].get("url") or info.get("url")
+            else:
+                best_v = info.get("url")
+
         if best_v:
             formats.append(
                 FormatOption(
-                    id="tiktok-hd-nowatermark",
-                    quality="MP4 Không Logo (Có tiếng)",
+                    id="tiktok-nowm",
+                    quality="MP4 Không Logo (Có hình & tiếng)",
                     type="video",
                     ext="mp4",
-                    filesize_str="HD Siêu Nét",
+                    filesize_str="Chuẩn H.264 Siêu Nét",
                     direct_url=best_v,
                     proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(best_v)}&title={urllib.parse.quote(safe_title)}&ext=mp4",
                     has_audio=True,
@@ -259,7 +299,7 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
 
         for f in raw_formats:
             f_url = f.get("url", "")
-            if f.get("vcodec") == "none" and f_url:
+            if f.get("vcodec") == "none" and f.get("acodec") != "none" and f_url:
                 formats.append(
                     FormatOption(
                         id="tiktok-audio",
@@ -361,16 +401,14 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
 
         for f in progressive_formats:
             height = f.get("height") or 0
-            if not height:
-                continue
-            q_key = f"{height}p"
-            if q_key not in seen_qualities and height in [1080, 720, 480, 360, 240]:
+            q_key = f"{height}p" if height else "mp4"
+            if q_key not in seen_qualities:
                 seen_qualities.add(q_key)
                 size_str = format_filesize(f.get("filesize") or f.get("filesize_approx"))
-                quality_title = f"MP4 {height}p (Có tiếng)"
+                quality_title = f"MP4 {height}p (Có tiếng)" if height else "MP4 Chuẩn (Có tiếng)"
                 formats.append(
                     FormatOption(
-                        id=f"yt-{height}p",
+                        id=f"yt-{height}p" if height else "yt-std",
                         quality=quality_title,
                         type="video",
                         ext="mp4",
@@ -395,10 +433,10 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
                 )
             )
 
-        # Audio formats
+        # Audio formats (Phải có acodec, không lấy storyboard ảnh thumbnail)
         audio_formats = [
             f for f in raw_formats
-            if f.get("url") and f.get("vcodec") == "none"
+            if f.get("url") and f.get("vcodec") == "none" and f.get("acodec") != "none"
         ]
         audio_formats.sort(key=lambda x: (x.get("abr") or 0), reverse=True)
 
@@ -415,6 +453,21 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
                     filesize_str=format_filesize(best_audio.get("filesize") or best_audio.get("filesize_approx")),
                     direct_url=best_audio["url"],
                     proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(best_audio['url'])}&title={urllib.parse.quote(safe_title)}&ext=mp3",
+                    has_audio=True,
+                )
+            )
+        elif progressive_formats:
+            # Nếu không có stream audio riêng, trích xuất âm thanh từ progressive video stream
+            best_prog = progressive_formats[0]
+            formats.append(
+                FormatOption(
+                    id="audio-from-video",
+                    quality="MP3 Âm thanh gốc (320kbps)",
+                    type="audio",
+                    ext="mp3",
+                    filesize_str="Chất lượng cao",
+                    direct_url=best_prog["url"],
+                    proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(best_prog['url'])}&title={urllib.parse.quote(safe_title)}&ext=mp3",
                     has_audio=True,
                 )
             )
