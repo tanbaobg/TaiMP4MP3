@@ -4,3 +4,4 @@ yt-dlp>=2024.3.10
 httpx>=0.26.0
 pydantic>=2.6.0
 python-multipart>=0.0.9
+imageio-ffmpeg>=0.4.9

@@ -15,6 +15,13 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentFilter = 'all'; // 'all', 'video', 'audio'
   let deferredInstallPrompt = null;
 
+  // Trimmer State
+  let trimMode = 'keep'; // 'keep' (lấy đoạn) or 'remove' (bỏ đoạn)
+  let trimStartSec = 0;
+  let trimEndSec = 30;
+  let currentDirectStreamUrl = '';
+  let activeTrimPreviewTimer = null;
+
   // --- DOM Elements ---
   const form = document.getElementById('form-analyze');
   const inputUrl = document.getElementById('input-url');
@@ -37,6 +44,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const resPlatformBadge = document.getElementById('res-platform-badge');
   const formatsGrid = document.getElementById('formats-grid');
   const formatTabs = document.querySelectorAll('.format-tab');
+
+  // In-Page Player & Trimmer Elements
+  const inlineVideoPlayer = document.getElementById('inline-video-player');
+  const playerTimeDisplay = document.getElementById('player-time-display');
+  const btnModeKeep = document.getElementById('btn-mode-keep');
+  const btnModeRemove = document.getElementById('btn-mode-remove');
+  const trimStartTimeInput = document.getElementById('trim-start-time');
+  const trimEndTimeInput = document.getElementById('trim-end-time');
+  const btnSetStartCurr = document.getElementById('btn-set-start-curr');
+  const btnSetEndCurr = document.getElementById('btn-set-end-curr');
+  const trimDurationBadge = document.getElementById('trim-duration-badge');
+  const trimModeDesc = document.getElementById('trim-mode-desc');
+  const btnPreviewTrimSegment = document.getElementById('btn-preview-trim-segment');
+  const btnDownloadTrimMp4 = document.getElementById('btn-download-trim-mp4');
+  const btnDownloadTrimMp3 = document.getElementById('btn-download-trim-mp3');
+  const trimLoading = document.getElementById('trim-loading');
 
   const btnPreviewMedia = document.getElementById('btn-preview-media');
   const modalPreview = document.getElementById('modal-preview');
@@ -81,6 +104,49 @@ document.addEventListener('DOMContentLoaded', () => {
     return null;
   }
 
+  // --- Time Helpers ---
+  function secondsToTimeCode(sec) {
+    const s = Math.max(0, Math.floor(sec || 0));
+    const m = Math.floor(s / 60);
+    const h = Math.floor(m / 60);
+    const remM = m % 60;
+    const remS = s % 60;
+    return `${String(h).padStart(2, '0')}:${String(remM).padStart(2, '0')}:${String(remS).padStart(2, '0')}`;
+  }
+
+  function timeCodeToSeconds(code) {
+    if (!code) return 0;
+    const parts = String(code).trim().split(':').map(Number);
+    if (parts.length === 3) {
+      return (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+    }
+    if (parts.length === 2) {
+      return (parts[0] || 0) * 60 + (parts[1] || 0);
+    }
+    return Math.max(0, parseFloat(code) || 0);
+  }
+
+  function updateTrimSummary() {
+    const totalDur = currentMediaData?.duration_seconds || inlineVideoPlayer.duration || 60;
+    trimStartSec = timeCodeToSeconds(trimStartTimeInput.value);
+    trimEndSec = timeCodeToSeconds(trimEndTimeInput.value);
+
+    if (trimEndSec <= trimStartSec) {
+      trimEndSec = Math.min(trimStartSec + 30, totalDur);
+      trimEndTimeInput.value = secondsToTimeCode(trimEndSec);
+    }
+
+    if (trimMode === 'keep') {
+      const segmentDur = Math.max(0, trimEndSec - trimStartSec);
+      trimDurationBadge.textContent = `Thời lượng lấy: ${secondsToTimeCode(segmentDur)}`;
+      trimModeDesc.textContent = `(Sẽ trích xuất đoạn từ ${secondsToTimeCode(trimStartSec)} đến ${secondsToTimeCode(trimEndSec)})`;
+    } else {
+      const remainingDur = Math.max(0, totalDur - (trimEndSec - trimStartSec));
+      trimDurationBadge.textContent = `Thời lượng còn lại: ~${secondsToTimeCode(remainingDur)}`;
+      trimModeDesc.textContent = `(Sẽ cắt bỏ đoạn từ ${secondsToTimeCode(trimStartSec)} đến ${secondsToTimeCode(trimEndSec)}, ghép phần trước & sau)`;
+    }
+  }
+
   // --- Real-time Input Validation & UI Updates ---
   inputUrl.addEventListener('input', () => {
     const text = inputUrl.value.trim();
@@ -115,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         inputUrl.focus();
       }
-    } catch (err) {
+    } catch {
       inputUrl.focus();
     }
   });
@@ -128,7 +194,6 @@ document.addEventListener('DOMContentLoaded', () => {
       showError('Vui lòng nhập hoặc dán đường dẫn URL cần tải');
       return;
     }
-
     startAnalysis(url);
   });
 
@@ -170,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // --- Render Result Card ---
+  // --- Render Result Card with In-Page Player & Trimmer ---
   function renderResult(data) {
     resThumbnail.src = data.thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60';
     resDuration.textContent = data.duration_str || 'Video';
@@ -180,6 +245,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // Platform Badge
     const platform = detectPlatform(data.url) || { name: data.platform.toUpperCase(), color: 'blue' };
     resPlatformBadge.textContent = platform.name;
+
+    // Find best stream for In-Page Preview & Trimmer
+    const firstVideoFormat = data.formats.find((f) => f.type === 'video' && (f.direct_url || f.proxy_url));
+    const firstAudioFormat = data.formats.find((f) => f.type === 'audio' && (f.direct_url || f.proxy_url));
+    const streamTarget = firstVideoFormat || firstAudioFormat;
+
+    if (streamTarget) {
+      currentDirectStreamUrl = streamTarget.direct_url || streamTarget.proxy_url;
+      inlineVideoPlayer.src = currentDirectStreamUrl;
+      inlineVideoPlayer.load();
+
+      // Initialize Trimmer values
+      const dur = data.duration_seconds || 30;
+      trimStartSec = 0;
+      trimEndSec = Math.min(dur, 30);
+      trimStartTimeInput.value = secondsToTimeCode(0);
+      trimEndTimeInput.value = secondsToTimeCode(trimEndSec);
+      updateTrimSummary();
+    }
 
     renderFormats();
     resultContainer.classList.remove('hidden');
@@ -191,6 +275,120 @@ document.addEventListener('DOMContentLoaded', () => {
     // Smooth scroll down to result
     resultContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+
+  // --- In-Page Player Time Tracker ---
+  inlineVideoPlayer.addEventListener('timeupdate', () => {
+    const cur = secondsToTimeCode(inlineVideoPlayer.currentTime);
+    const dur = secondsToTimeCode(inlineVideoPlayer.duration || currentMediaData?.duration_seconds || 0);
+    playerTimeDisplay.textContent = `${cur} / ${dur}`;
+  });
+
+  // --- Trimmer Controls ---
+  btnSetStartCurr.addEventListener('click', () => {
+    trimStartSec = inlineVideoPlayer.currentTime || 0;
+    trimStartTimeInput.value = secondsToTimeCode(trimStartSec);
+    updateTrimSummary();
+    showNotification(`Đã đặt Bắt đầu: ${secondsToTimeCode(trimStartSec)}`);
+  });
+
+  btnSetEndCurr.addEventListener('click', () => {
+    trimEndSec = inlineVideoPlayer.currentTime || 0;
+    trimEndTimeInput.value = secondsToTimeCode(trimEndSec);
+    updateTrimSummary();
+    showNotification(`Đã đặt Kết thúc: ${secondsToTimeCode(trimEndSec)}`);
+  });
+
+  trimStartTimeInput.addEventListener('change', updateTrimSummary);
+  trimEndTimeInput.addEventListener('change', updateTrimSummary);
+
+  // Mode Toggle: Keep (Lấy) vs Remove (Bỏ)
+  btnModeKeep.addEventListener('click', () => {
+    trimMode = 'keep';
+    btnModeKeep.className = 'px-3 py-1.5 text-xs font-bold rounded-md bg-blue-600 text-white shadow-sm flex items-center gap-1.5 transition-all';
+    btnModeRemove.className = 'px-3 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white flex items-center gap-1.5 transition-all';
+    updateTrimSummary();
+  });
+
+  btnModeRemove.addEventListener('click', () => {
+    trimMode = 'remove';
+    btnModeRemove.className = 'px-3 py-1.5 text-xs font-bold rounded-md bg-rose-600 text-white shadow-sm flex items-center gap-1.5 transition-all';
+    btnModeKeep.className = 'px-3 py-1.5 text-xs font-semibold rounded-md text-slate-400 hover:text-white flex items-center gap-1.5 transition-all';
+    updateTrimSummary();
+  });
+
+  // Preview Trim Segment
+  btnPreviewTrimSegment.addEventListener('click', () => {
+    updateTrimSummary();
+    if (!inlineVideoPlayer.src) {
+      showNotification('Chưa tải được nguồn video để phát thử');
+      return;
+    }
+
+    if (activeTrimPreviewTimer) {
+      clearInterval(activeTrimPreviewTimer);
+      activeTrimPreviewTimer = null;
+    }
+
+    if (trimMode === 'keep') {
+      inlineVideoPlayer.currentTime = trimStartSec;
+      inlineVideoPlayer.play().catch(() => {});
+      showNotification(`Đang phát thử đoạn từ ${secondsToTimeCode(trimStartSec)} đến ${secondsToTimeCode(trimEndSec)}`);
+
+      activeTrimPreviewTimer = setInterval(() => {
+        if (inlineVideoPlayer.currentTime >= trimEndSec) {
+          inlineVideoPlayer.pause();
+          clearInterval(activeTrimPreviewTimer);
+          activeTrimPreviewTimer = null;
+          showNotification('Đã phát xong đoạn đã chọn!');
+        }
+      }, 250);
+    } else {
+      // Mode remove: play from 0, jump across cut segment
+      inlineVideoPlayer.currentTime = 0;
+      inlineVideoPlayer.play().catch(() => {});
+      showNotification(`Đang phát thử: sẽ tự động bỏ qua đoạn từ ${secondsToTimeCode(trimStartSec)} đến ${secondsToTimeCode(trimEndSec)}`);
+
+      activeTrimPreviewTimer = setInterval(() => {
+        if (inlineVideoPlayer.currentTime >= trimStartSec && inlineVideoPlayer.currentTime < trimEndSec) {
+          inlineVideoPlayer.currentTime = trimEndSec;
+          showNotification(`Đã nhảy qua đoạn cắt bỏ đến ${secondsToTimeCode(trimEndSec)}`);
+        }
+      }, 200);
+    }
+  });
+
+  // Download Trimmed Media (MP4 / MP3)
+  async function triggerTrimDownload(mediaType) {
+    updateTrimSummary();
+    if (!currentMediaData || !currentDirectStreamUrl) {
+      showError('Không tìm thấy nguồn video hợp lệ để cắt');
+      return;
+    }
+
+    trimLoading.classList.remove('hidden');
+    const safeTitle = currentMediaData.title || 'video';
+    const totalDuration = currentMediaData.duration_seconds || inlineVideoPlayer.duration || 60;
+
+    const trimApiUrl = `${currentApiBase.replace(/\/$/, '')}/api/trim?url=${encodeURIComponent(currentDirectStreamUrl)}&start=${trimStartSec}&end=${trimEndSec}&mode=${trimMode}&type=${mediaType}&duration=${totalDuration}&title=${encodeURIComponent(safeTitle)}`;
+
+    showNotification(`Bắt đầu xử lý cắt ${mediaType.toUpperCase()}...`);
+
+    // Create invisible anchor to trigger file download stream
+    const dlLink = document.createElement('a');
+    dlLink.href = trimApiUrl;
+    dlLink.setAttribute('download', '');
+    document.body.appendChild(dlLink);
+    dlLink.click();
+    dlLink.remove();
+
+    setTimeout(() => {
+      trimLoading.classList.add('hidden');
+      showNotification(`File ${mediaType.toUpperCase()} đã cắt đang được tải về!`);
+    }, 3500);
+  }
+
+  btnDownloadTrimMp4.addEventListener('click', () => triggerTrimDownload('video'));
+  btnDownloadTrimMp3.addEventListener('click', () => triggerTrimDownload('audio'));
 
   // --- Format Filter Tabs & Cards ---
   formatTabs.forEach((tab) => {
@@ -252,7 +450,6 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
 
         <div class="flex items-center gap-1.5 shrink-0">
-          <!-- Copy link -->
           <button 
             type="button" 
             data-url="${targetDownloadUrl}" 
@@ -262,7 +459,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <i data-lucide="copy" class="w-4 h-4"></i>
           </button>
 
-          <!-- Download button -->
           <a 
             href="${targetDownloadUrl}" 
             target="_blank" 
@@ -283,7 +479,6 @@ document.addEventListener('DOMContentLoaded', () => {
       window.lucide.createIcons();
     }
 
-    // Attach copy events
     document.querySelectorAll('.btn-copy-format').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const urlToCopy = btn.getAttribute('data-url');
@@ -295,7 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // --- Preview Player Modal ---
+  // --- Preview Player Modal (Secondary) ---
   btnPreviewMedia.addEventListener('click', () => {
     if (!currentMediaData) return;
     const firstVideo = currentMediaData.formats.find((f) => f.type === 'video' && (f.direct_url || f.proxy_url));
@@ -347,7 +542,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function saveToHistory(media) {
     let history = getHistory();
-    // Prevent duplicate urls
     history = history.filter((item) => item.url !== media.url);
     history.unshift({
       title: media.title,
@@ -357,7 +551,6 @@ document.addEventListener('DOMContentLoaded', () => {
       duration: media.duration_str,
       time: new Date().toLocaleDateString('vi-VN')
     });
-    // Keep max 30
     if (history.length > 30) history = history.slice(0, 30);
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
   }
@@ -496,16 +689,14 @@ document.addEventListener('DOMContentLoaded', () => {
     deferredInstallPrompt = null;
   });
 
-  // Register Service Worker
   if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
 
-  // --- Auto-fill from URL Query Parameter (useful for Android Share Intent) ---
+  // Auto-fill from URL Query Parameter
   const urlParams = new URLSearchParams(window.location.search);
   const sharedUrl = urlParams.get('url') || urlParams.get('text');
   if (sharedUrl) {
-    // Extract actual URL if text contains other words (like TikTok share sheet text)
     const match = sharedUrl.match(/(https?:\/\/[^\s]+)/g);
     const finalUrl = match ? match[0] : sharedUrl;
     inputUrl.value = finalUrl;

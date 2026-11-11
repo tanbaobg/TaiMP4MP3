@@ -1,5 +1,6 @@
 import os
 import urllib.parse
+import asyncio
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, RedirectResponse
@@ -9,13 +10,15 @@ import yt_dlp
 
 try:
     from extractor import extract_info, MediaInfo, clean_title
+    from trimmer import get_ffmpeg_path, parse_time, format_time_code, get_stream_headers
 except ImportError:
     from .extractor import extract_info, MediaInfo, clean_title
+    from .trimmer import get_ffmpeg_path, parse_time, format_time_code, get_stream_headers
 
 app = FastAPI(
     title="TaiMP4MP3 Serverless",
-    description="Web & API Serverless chạy trên Vercel",
-    version="1.0.0",
+    description="Web, API & Video Trimmer Serverless chạy trên Vercel",
+    version="1.1.0",
 )
 
 app.add_middleware(
@@ -103,6 +106,7 @@ def api_status():
         "app": "TaiMP4MP3 Serverless API",
         "platform": "Vercel",
         "status": "online",
+        "features": ["video_download", "audio_extract", "video_trim", "audio_trim"],
         "yt_dlp": yt_dlp.version.__version__,
     }
 
@@ -111,7 +115,7 @@ def api_status():
 def health_check():
     return {
         "status": "healthy",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "yt_dlp": yt_dlp.version.__version__,
     }
 
@@ -193,3 +197,138 @@ async def download_proxy(
     except Exception as e:
         await client.aclose()
         raise HTTPException(status_code=502, detail=f"Lỗi khi tải stream: {str(e)}")
+
+# --- VIDEO & AUDIO TRIMMER ENDPOINT ---
+@app.get("/trim")
+@app.get("/api/trim")
+async def trim_media(
+    url: str = Query(..., description="Đường dẫn file media trực tiếp"),
+    start: str = Query("0", description="Thời điểm bắt đầu"),
+    end: str = Query("0", description="Thời điểm kết thúc"),
+    mode: str = Query("keep", description="'keep' hoặc 'remove'"),
+    type: str = Query("video", description="'video' hoặc 'audio'"),
+    duration: float = Query(0.0, description="Tổng thời lượng"),
+    title: str = Query("trimmed", description="Tên file tải về"),
+):
+    decoded_url = urllib.parse.unquote(url)
+    start_sec = parse_time(start)
+    end_sec = parse_time(end)
+    safe_title = clean_title(urllib.parse.unquote(title))
+    ext = "mp4" if type == "video" else "mp3"
+    media_type = "video/mp4" if type == "video" else "audio/mpeg"
+
+    ffmpeg_bin = get_ffmpeg_path()
+    headers_str = get_stream_headers(decoded_url)
+
+    if mode == "keep":
+        if end_sec <= start_sec:
+            end_sec = start_sec + 30.0
+
+        filename = f"{safe_title}_doan_{int(start_sec)}s-{int(end_sec)}s.{ext}"
+        if type == "video":
+            cmd = [
+                ffmpeg_bin,
+                "-y",
+                "-ss", str(start_sec),
+                "-to", str(end_sec),
+                "-headers", headers_str,
+                "-i", decoded_url,
+                "-c", "copy",
+                "-movflags", "frag_keyframe+empty_moov+default_base_moof",
+                "-f", "mp4",
+                "pipe:1"
+            ]
+        else:
+            cmd = [
+                ffmpeg_bin,
+                "-y",
+                "-ss", str(start_sec),
+                "-to", str(end_sec),
+                "-headers", headers_str,
+                "-i", decoded_url,
+                "-vn",
+                "-c:a", "libmp3lame",
+                "-q:a", "2",
+                "-f", "mp3",
+                "pipe:1"
+            ]
+    else:
+        # Mode == "remove" (cut out start to end)
+        total_dur = duration if duration > end_sec else end_sec + 60.0
+        filename = f"{safe_title}_bo_{int(start_sec)}s-{int(end_sec)}s.{ext}"
+        if type == "video":
+            filter_str = (
+                f"[0:v]trim=0:{start_sec},setpts=PTS-STARTPTS[v1];"
+                f"[0:v]trim={end_sec}:{total_dur},setpts=PTS-STARTPTS[v2];"
+                f"[0:a]atrim=0:{start_sec},asetpts=PTS-STARTPTS[a1];"
+                f"[0:a]atrim={end_sec}:{total_dur},asetpts=PTS-STARTPTS[a2];"
+                f"[v1][a1][v2][a2]concat=n=2:v=1:a=1[outv][outa]"
+            )
+            cmd = [
+                ffmpeg_bin,
+                "-y",
+                "-headers", headers_str,
+                "-i", decoded_url,
+                "-filter_complex", filter_str,
+                "-map", "[outv]",
+                "-map", "[outa]",
+                "-c:v", "libx264",
+                "-preset", "ultrafast",
+                "-c:a", "aac",
+                "-movflags", "frag_keyframe+empty_moov+default_base_moof",
+                "-f", "mp4",
+                "pipe:1"
+            ]
+        else:
+            filter_str = (
+                f"[0:a]atrim=0:{start_sec},asetpts=PTS-STARTPTS[a1];"
+                f"[0:a]atrim={end_sec}:{total_dur},asetpts=PTS-STARTPTS[a2];"
+                f"[a1][a2]concat=n=2:v=0:a=1[outa]"
+            )
+            cmd = [
+                ffmpeg_bin,
+                "-y",
+                "-headers", headers_str,
+                "-i", decoded_url,
+                "-filter_complex", filter_str,
+                "-map", "[outa]",
+                "-c:a", "libmp3lame",
+                "-q:a", "2",
+                "-f", "mp3",
+                "pipe:1"
+            ]
+
+    encoded_filename = urllib.parse.quote(filename)
+    content_disposition = f"attachment; filename*=UTF-8''{encoded_filename}"
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+
+        async def stream_ffmpeg():
+            try:
+                while True:
+                    chunk = await proc.stdout.read(64 * 1024)
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                if proc.returncode is None:
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+
+        return StreamingResponse(
+            stream_ffmpeg(),
+            media_type=media_type,
+            headers={
+                "Content-Disposition": content_disposition,
+                "Accept-Ranges": "bytes",
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lỗi khi cắt video/audio: {str(e)}")
