@@ -113,119 +113,67 @@
   <!-- Background decorative glowing orbs -->
   <div class="glow-bg"></div>
 
-  <!-- Header -->
-  <header class="sticky top-0 z-40 border-b border-slate-800/80 glass-panel">
-    <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-      <!-- Logo -->
-      <a href="/" class="flex items-center gap-2.5 group">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-pink-500 flex items-center justify-center shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform">
-          <i data-lucide="download" class="w-5 h-5 text-white"></i>
-        </div>
-        <div>
-          <span class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 via-indigo-300 to-pink-400 bg-clip-text text-transparent">
-            TaiMP4MP3
-          </span>
-          <span class="hidden sm:inline-block ml-1.5 px-2 py-0.5 text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full">
-            Web & Android
-          </span>
-        </div>
-      </a>
-
-      <!-- Header Actions -->
-      <div class="flex items-center gap-2 sm:gap-3">
-        <!-- Install App Button (Desktop & Mobile) -->
-        <button id="btn-open-install" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 transition-all shadow-sm">
-          <i data-lucide="download-cloud" class="w-4 h-4"></i>
-          <span id="header-install-text">Cài Đặt App</span>
-        </button>
-
-        <!-- Android APK Download link -->
-        <a id="btn-download-apk" href="/taimp4mp3-latest.apk" download="taimp4mp3.apk" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/30 transition-colors">
-          <i data-lucide="package" class="w-4 h-4"></i>
-          <span>Tải APK</span>
+  <!-- Header (Top Navigation Strip) -->
+  <header id="main-header" class="sticky top-0 z-40 border-b border-slate-800/80 glass-panel transition-all duration-700">
+    <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between transition-all duration-700">
+      
+      <!-- Collapsible Brand Logo & Title (Shows for 15s, then collapses) -->
+      <div id="header-brand-group" class="flex items-center gap-2.5 transition-all duration-700 ease-out">
+        <a href="/" class="flex items-center gap-2.5 group">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-pink-500 flex items-center justify-center shadow-lg shadow-blue-500/25 group-hover:scale-105 transition-transform">
+            <i data-lucide="download" class="w-5 h-5 text-white"></i>
+          </div>
+          <div>
+            <span class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 via-indigo-300 to-pink-400 bg-clip-text text-transparent">
+              TaiMP4MP3
+            </span>
+            <span class="hidden sm:inline-block ml-1.5 px-2 py-0.5 text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-full">
+              Web & Android
+            </span>
+          </div>
         </a>
+      </div>
 
-        <!-- History Button -->
-        <button id="btn-open-history" title="Lịch sử tải" class="p-2 rounded-lg bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700/80 transition-colors">
-          <i data-lucide="history" class="w-5 h-5"></i>
+      <!-- Right Actions -->
+      <div class="flex items-center gap-2 sm:gap-2.5 ml-auto">
+        
+        <!-- Collapsible Tools & Install Group (Shows for 15s, then collapses) -->
+        <div id="header-tools-group" class="flex items-center gap-2 sm:gap-2.5 transition-all duration-700 ease-out">
+          
+          <!-- Animated Pointer Arrow indicating Install -->
+          <div class="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold animate-pulse">
+            <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+            <span>Cài đặt</span>
+            <span id="header-countdown-num" class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-900 text-emerald-300">15s</span>
+          </div>
+
+          <!-- Install App Button -->
+          <button id="btn-open-install" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 transition-all shadow-sm">
+            <i data-lucide="download-cloud" class="w-4 h-4"></i>
+            <span id="header-install-text">Cài Đặt App</span>
+            <span id="header-countdown-mobile" class="sm:hidden text-[10px] font-mono font-bold bg-slate-900 px-1.5 py-0.5 rounded text-emerald-300">15s</span>
+          </button>
+
+          <!-- Android APK Download link -->
+          <a id="btn-download-apk" href="/taimp4mp3-latest.apk" download="taimp4mp3.apk" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/30 transition-colors">
+            <i data-lucide="package" class="w-4 h-4"></i>
+            <span>Tải APK</span>
+          </a>
+
+          <!-- History Button -->
+          <button id="btn-open-history" title="Lịch sử tải" class="p-2 rounded-lg bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700/80 transition-colors">
+            <i data-lucide="history" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- The Gear Icon (Biểu tượng bánh răng - Always Preserved) -->
+        <button id="btn-open-settings" title="Cài đặt & Tiện ích" class="p-2 sm:p-2.5 rounded-xl bg-slate-800/90 text-slate-200 hover:text-white hover:bg-blue-600 border border-slate-700/80 hover:border-blue-500 transition-all shadow-md group pointer-events-auto">
+          <i data-lucide="settings" class="w-5 h-5 group-hover:rotate-45 transition-transform duration-300"></i>
         </button>
 
-        <!-- Settings Button -->
-        <button id="btn-open-settings" title="Cài đặt API" class="p-2 rounded-lg bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700/80 transition-colors">
-          <i data-lucide="settings" class="w-5 h-5"></i>
-        </button>
-
-        <!-- GitHub Repo -->
-        <a href="https://github.com/tanbaobg/TaiMP4MP3" target="_blank" title="GitHub" class="p-2 rounded-lg bg-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-700/80 transition-colors">
-          <i data-lucide="github" class="w-5 h-5"></i>
-        </a>
       </div>
     </div>
   </header>
-
-  <!-- Floating Installation Arrow & Callout with 15s Countdown -->
-  <div id="install-callout-toast" class="hidden fixed top-[68px] right-2 sm:right-6 md:right-10 z-50 max-w-[340px] sm:max-w-sm w-[calc(100vw-1rem)] transition-all duration-500 ease-out transform -translate-y-4 opacity-0 pointer-events-auto">
-    <!-- Pointing Arrow Indicator (pointing upwards to Header Install button) -->
-    <div class="flex justify-end pr-6 sm:pr-10 mb-[-5px] relative z-10">
-      <div class="flex flex-col items-center animate-bounce">
-        <span class="text-[11px] font-extrabold text-emerald-400 bg-slate-900 px-2.5 py-0.5 rounded-full border border-emerald-500/50 shadow-md flex items-center gap-1">
-          <i data-lucide="arrow-up" class="w-3.5 h-3.5 text-emerald-400 animate-pulse"></i>
-          <span>Bấm cài đặt tại đây</span>
-        </span>
-        <div class="w-2.5 h-2.5 bg-slate-900 border-t border-l border-emerald-500/50 rotate-45 mt-[-3px]"></div>
-      </div>
-    </div>
-
-    <!-- Callout Card -->
-    <div class="glass-panel bg-slate-900/95 backdrop-blur-xl rounded-2xl p-4 border border-blue-500/40 shadow-2xl shadow-blue-500/20 space-y-3 relative overflow-hidden">
-      <!-- Top Shrinking Progress Bar (15s) -->
-      <div class="absolute top-0 left-0 right-0 h-1 bg-slate-800">
-        <div id="install-timer-progress" class="h-full bg-gradient-to-r from-emerald-400 via-blue-500 to-pink-500 transition-all duration-1000 ease-linear" style="width: 100%;"></div>
-      </div>
-
-      <!-- Header with Icon & 15s Countdown Badge -->
-      <div class="flex items-center justify-between pt-1">
-        <div class="flex items-center gap-2">
-          <div class="w-7 h-7 rounded-lg bg-gradient-to-tr from-blue-600 via-indigo-600 to-pink-500 flex items-center justify-center text-white shrink-0 shadow-md">
-            <i data-lucide="download-cloud" class="w-4 h-4"></i>
-          </div>
-          <div>
-            <span class="text-xs font-extrabold text-white block leading-tight">Chưa cài đặt TaiMP4MP3?</span>
-            <span class="text-[10px] text-slate-400">Máy tính & Điện thoại</span>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-1.5">
-          <!-- Countdown Badge -->
-          <span id="install-countdown-badge" class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-800 text-blue-300 border border-slate-700 shadow-inner">
-            15s
-          </span>
-          <!-- Close Button -->
-          <button type="button" id="btn-close-callout" class="p-1 text-slate-400 hover:text-white rounded-md hover:bg-slate-800 transition-colors" title="Đóng">
-            <i data-lucide="x" class="w-3.5 h-3.5"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- Description -->
-      <p class="text-[11px] text-slate-300 leading-snug">
-        Cài ứng dụng về máy để mở từ màn hình chính, tải video TikTok/FB/YouTube tốc độ cao và xem trước mượt mà!
-      </p>
-
-      <!-- Quick Action Buttons -->
-      <div class="grid grid-cols-2 gap-2 pt-0.5">
-        <button type="button" id="btn-callout-install" class="py-2 px-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/25 active:scale-95 transition-all">
-          <i data-lucide="download-cloud" class="w-3.5 h-3.5"></i>
-          <span>Cài Đặt Ngay</span>
-        </button>
-
-        <a href="/taimp4mp3-latest.apk" download="taimp4mp3.apk" class="py-2 px-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all">
-          <i data-lucide="package" class="w-3.5 h-3.5"></i>
-          <span>Tải file APK</span>
-        </a>
-      </div>
-    </div>
-  </div>
 
   <!-- Main Content -->
   <main class="max-w-4xl mx-auto px-4 py-8 sm:py-12 relative z-10">
@@ -318,49 +266,6 @@
           <span id="platform-text" class="text-slate-300">Phát hiện link: ...</span>
         </div>
       </form>
-    </div>
-
-    <!-- Quick App Installation Banner -->
-    <div class="glass-panel rounded-2xl p-4 sm:p-5 mb-8 border border-slate-800/80 shadow-xl relative overflow-hidden">
-      <div class="absolute -right-8 -top-8 w-36 h-36 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
-      <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-        <div class="flex items-center gap-3.5">
-          <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-pink-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-blue-500/25">
-            <i data-lucide="smartphone" class="w-6 h-6"></i>
-          </div>
-          <div>
-            <div class="flex items-center gap-2 flex-wrap">
-              <h2 class="text-sm sm:text-base font-extrabold text-white">Cài đặt TaiMP4MP3 trên Điện thoại & Máy tính</h2>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Miễn Phí</span>
-            </div>
-            <p class="text-xs text-slate-400 mt-0.5">
-              Mở từ màn hình chính như app thật, xem trước mượt mà, tải nhanh không cần mở tab trình duyệt
-            </p>
-          </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="flex items-center gap-2 flex-wrap w-full lg:w-auto shrink-0">
-          <button type="button" id="btn-banner-install-pc" class="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/20 transition-all">
-            <i data-lucide="monitor" class="w-3.5 h-3.5"></i>
-            <span>Cài vào Máy tính</span>
-          </button>
-
-          <button type="button" id="btn-banner-install-phone" class="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-pink-500/20 transition-all">
-            <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
-            <span>Cài vào Điện thoại</span>
-          </button>
-
-          <a href="/taimp4mp3-latest.apk" download="taimp4mp3.apk" class="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 text-xs font-bold flex items-center justify-center gap-1.5 transition-all">
-            <i data-lucide="package" class="w-3.5 h-3.5"></i>
-            <span>Tải file APK</span>
-          </a>
-
-          <button type="button" id="btn-banner-guide" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors" title="Hướng dẫn cài đặt">
-            <i data-lucide="help-circle" class="w-4 h-4"></i>
-          </button>
-        </div>
-      </div>
     </div>
 
     <!-- Loading State -->
@@ -627,33 +532,79 @@
     </div>
   </div>
 
-  <!-- 2. Settings Modal (API URL Configuration) -->
-  <div id="modal-settings" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="glass-panel w-full max-w-md rounded-2xl p-5 border border-slate-700/80 shadow-2xl space-y-4">
+  <!-- 2. Settings & Tools Modal (Opened by Gear Icon) -->
+  <div id="modal-settings" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-md rounded-2xl p-5 border border-slate-700/80 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between pb-3 border-b border-slate-800">
         <div class="flex items-center gap-2">
-          <i data-lucide="settings" class="w-5 h-5 text-blue-400"></i>
-          <h3 class="text-base font-bold text-white">Cấu hình Máy Chủ API</h3>
+          <div class="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center">
+            <i data-lucide="settings" class="w-4 h-4"></i>
+          </div>
+          <h3 class="text-base font-bold text-white">Cài Đặt & Menu Tiện Ích</h3>
         </div>
-        <button id="btn-close-settings" class="p-1 text-slate-400 hover:text-white">
+        <button id="btn-close-settings" class="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
-      <div class="space-y-3">
+
+      <!-- Quick Action Menu Grid -->
+      <div class="space-y-2">
+        <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tiện ích ứng dụng:</label>
+        <div class="grid grid-cols-2 gap-2">
+          <!-- Install App -->
+          <button type="button" id="btn-menu-install" class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 text-left space-y-1 transition-all group">
+            <div class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <i data-lucide="download-cloud" class="w-4 h-4"></i>
+            </div>
+            <div class="text-xs font-bold text-white">Cài Đặt App</div>
+            <div class="text-[10px] text-slate-400">PC / Android / iOS</div>
+          </button>
+
+          <!-- Download APK -->
+          <a href="/taimp4mp3-latest.apk" download="taimp4mp3.apk" class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-blue-500/40 text-left space-y-1 transition-all group block">
+            <div class="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <i data-lucide="package" class="w-4 h-4"></i>
+            </div>
+            <div class="text-xs font-bold text-white">Tải File APK</div>
+            <div class="text-[10px] text-slate-400">Android Native 4.5MB</div>
+          </a>
+
+          <!-- Download History -->
+          <button type="button" id="btn-menu-history" class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-indigo-500/40 text-left space-y-1 transition-all group">
+            <div class="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <i data-lucide="history" class="w-4 h-4"></i>
+            </div>
+            <div class="text-xs font-bold text-white">Lịch Sử Tải</div>
+            <div class="text-[10px] text-slate-400">Xem lại video đã tải</div>
+          </button>
+
+          <!-- Restore Top Header -->
+          <button type="button" id="btn-menu-restore-header" class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-pink-500/40 text-left space-y-1 transition-all group">
+            <div class="w-7 h-7 rounded-lg bg-pink-500/20 text-pink-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <i data-lucide="layout-template" class="w-4 h-4"></i>
+            </div>
+            <div class="text-xs font-bold text-white">Hiện Thanh Menu</div>
+            <div class="text-[10px] text-slate-400">Hiển thị dải trên</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- API Configuration -->
+      <div class="pt-2 border-t border-slate-800/80 space-y-2.5">
+        <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Cấu hình máy chủ API:</label>
         <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Backend API Endpoint:</label>
           <input 
             type="text" 
             id="input-api-url" 
             placeholder="Để trống nếu dùng API tích hợp của Vercel"
-            class="w-full px-3 py-2 bg-slate-900 text-sm text-white rounded-lg border border-slate-700 focus:outline-none focus:border-blue-500"
+            class="w-full px-3 py-2 bg-slate-900 text-xs text-white rounded-lg border border-slate-700 focus:outline-none focus:border-blue-500"
           >
-          <p class="text-[11px] text-slate-400 mt-1">
+          <p class="text-[10px] text-slate-400 mt-1">
             Mặc định ứng dụng tự động kết nối với API Serverless của Vercel.
           </p>
         </div>
 
-        <div class="flex items-center justify-between pt-2">
+        <div class="flex items-center justify-between pt-1">
           <button id="btn-test-api" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 hover:text-white flex items-center gap-1.5">
             <span id="api-status-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
             <span>Kiểm tra kết nối</span>

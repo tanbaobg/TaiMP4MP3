@@ -853,10 +853,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- Installation & PWA Management ---
+  const mainHeader = document.getElementById('main-header');
+  const headerBrandGroup = document.getElementById('header-brand-group');
+  const headerToolsGroup = document.getElementById('header-tools-group');
+  const headerCountdownNum = document.getElementById('header-countdown-num');
+  const headerCountdownMobile = document.getElementById('header-countdown-mobile');
+
   const btnOpenInstall = document.getElementById('btn-open-install');
-  const btnBannerInstallPc = document.getElementById('btn-banner-install-pc');
-  const btnBannerInstallPhone = document.getElementById('btn-banner-install-phone');
-  const btnBannerGuide = document.getElementById('btn-banner-guide');
   const modalInstallGuide = document.getElementById('modal-install-guide');
   const btnCloseInstallModal = document.getElementById('btn-close-install-modal');
   const headerInstallText = document.getElementById('header-install-text');
@@ -869,6 +872,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const tabContentIos = document.getElementById('tab-content-ios');
   const btnModalTriggerInstall = document.getElementById('btn-modal-trigger-install');
 
+  const btnMenuInstall = document.getElementById('btn-menu-install');
+  const btnMenuHistory = document.getElementById('btn-menu-history');
+  const btnMenuRestoreHeader = document.getElementById('btn-menu-restore-header');
+
   // Detect Device
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   const isAndroid = /Android/.test(navigator.userAgent);
@@ -877,31 +884,31 @@ document.addEventListener('DOMContentLoaded', () => {
   if (isStandalone) {
     if (headerInstallText) {
       headerInstallText.textContent = 'Đã Cài Đặt';
-      btnOpenInstall.classList.replace('text-emerald-400', 'text-blue-400');
-      btnOpenInstall.classList.replace('bg-emerald-600/20', 'bg-blue-600/20');
-      btnOpenInstall.classList.replace('border-emerald-500/30', 'border-blue-500/30');
+      btnOpenInstall?.classList.replace('text-emerald-400', 'text-blue-400');
+      btnOpenInstall?.classList.replace('bg-emerald-600/20', 'bg-blue-600/20');
+      btnOpenInstall?.classList.replace('border-emerald-500/30', 'border-blue-500/30');
     }
   }
 
   function switchInstallTab(tab) {
     [tabBtnPc, tabBtnAndroid, tabBtnIos].forEach(b => {
-      b.classList.remove('bg-blue-600', 'text-white');
-      b.classList.add('text-slate-400');
+      b?.classList.remove('bg-blue-600', 'text-white');
+      b?.classList.add('text-slate-400');
     });
-    [tabContentPc, tabContentAndroid, tabContentIos].forEach(c => c.classList.add('hidden'));
+    [tabContentPc, tabContentAndroid, tabContentIos].forEach(c => c?.classList.add('hidden'));
 
     if (tab === 'android') {
-      tabBtnAndroid.classList.add('bg-blue-600', 'text-white');
-      tabBtnAndroid.classList.remove('text-slate-400');
-      tabContentAndroid.classList.remove('hidden');
+      tabBtnAndroid?.classList.add('bg-blue-600', 'text-white');
+      tabBtnAndroid?.classList.remove('text-slate-400');
+      tabContentAndroid?.classList.remove('hidden');
     } else if (tab === 'ios') {
-      tabBtnIos.classList.add('bg-blue-600', 'text-white');
-      tabBtnIos.classList.remove('text-slate-400');
-      tabContentIos.classList.remove('hidden');
+      tabBtnIos?.classList.add('bg-blue-600', 'text-white');
+      tabBtnIos?.classList.remove('text-slate-400');
+      tabContentIos?.classList.remove('hidden');
     } else {
-      tabBtnPc.classList.add('bg-blue-600', 'text-white');
-      tabBtnPc.classList.remove('text-slate-400');
-      tabContentPc.classList.remove('hidden');
+      tabBtnPc?.classList.add('bg-blue-600', 'text-white');
+      tabBtnPc?.classList.remove('text-slate-400');
+      tabContentPc?.classList.remove('hidden');
     }
     if (window.lucide) window.lucide.createIcons();
   }
@@ -914,7 +921,7 @@ document.addEventListener('DOMContentLoaded', () => {
       else target = 'pc';
     }
     switchInstallTab(target);
-    modalInstallGuide.classList.remove('hidden');
+    modalInstallGuide?.classList.remove('hidden');
     if (window.lucide) window.lucide.createIcons();
   }
 
@@ -932,33 +939,36 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  if (btnBannerInstallPc) {
-    btnBannerInstallPc.addEventListener('click', () => {
-      if (deferredInstallPrompt && !isAndroid && !isIOS) {
+  if (btnMenuInstall) {
+    btnMenuInstall.addEventListener('click', () => {
+      modalSettings?.classList.add('hidden');
+      if (deferredInstallPrompt) {
         triggerBrowserInstall();
       } else {
-        openInstallModal('pc');
+        openInstallModal();
       }
     });
   }
 
-  if (btnBannerInstallPhone) {
-    btnBannerInstallPhone.addEventListener('click', () => {
-      if (isIOS) {
-        openInstallModal('ios');
-      } else {
-        openInstallModal('android');
-      }
+  if (btnMenuHistory) {
+    btnMenuHistory.addEventListener('click', () => {
+      modalSettings?.classList.add('hidden');
+      renderHistoryModal();
+      modalHistory?.classList.remove('hidden');
     });
   }
 
-  if (btnBannerGuide) {
-    btnBannerGuide.addEventListener('click', () => openInstallModal());
+  if (btnMenuRestoreHeader) {
+    btnMenuRestoreHeader.addEventListener('click', () => {
+      modalSettings?.classList.add('hidden');
+      restoreFullHeader();
+      showToast('Đã hiển thị lại thanh công cụ đầy đủ');
+    });
   }
 
   if (btnCloseInstallModal) {
     btnCloseInstallModal.addEventListener('click', () => {
-      modalInstallGuide.classList.add('hidden');
+      modalInstallGuide?.classList.add('hidden');
     });
   }
 
@@ -988,6 +998,65 @@ document.addEventListener('DOMContentLoaded', () => {
     btnModalTriggerInstall.addEventListener('click', triggerBrowserInstall);
   }
 
+  // --- 15-Second Top Navigation Strip Collapse ---
+  let headerCountdownSeconds = 15;
+  let headerTimerInterval = null;
+
+  function collapseTopHeader() {
+    if (headerTimerInterval) {
+      clearInterval(headerTimerInterval);
+      headerTimerInterval = null;
+    }
+    if (headerBrandGroup) {
+      headerBrandGroup.classList.add('opacity-0', '-translate-y-4', 'pointer-events-none');
+    }
+    if (headerToolsGroup) {
+      headerToolsGroup.classList.add('opacity-0', '-translate-y-4', 'pointer-events-none');
+    }
+
+    setTimeout(() => {
+      headerBrandGroup?.classList.add('hidden');
+      headerToolsGroup?.classList.add('hidden');
+      mainHeader?.classList.add('border-b-transparent', 'bg-transparent', 'shadow-none');
+      mainHeader?.classList.remove('border-b', 'border-slate-800/80', 'glass-panel');
+    }, 700);
+  }
+
+  function restoreFullHeader() {
+    if (headerTimerInterval) {
+      clearInterval(headerTimerInterval);
+      headerTimerInterval = null;
+    }
+    headerBrandGroup?.classList.remove('hidden');
+    headerToolsGroup?.classList.remove('hidden');
+    void mainHeader?.offsetWidth;
+
+    headerBrandGroup?.classList.remove('opacity-0', '-translate-y-4', 'pointer-events-none');
+    headerToolsGroup?.classList.remove('opacity-0', '-translate-y-4', 'pointer-events-none');
+    mainHeader?.classList.remove('border-b-transparent', 'bg-transparent', 'shadow-none');
+    mainHeader?.classList.add('border-b', 'border-slate-800/80', 'glass-panel');
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  function startHeader15sTimer() {
+    headerCountdownSeconds = 15;
+    if (headerCountdownNum) headerCountdownNum.textContent = '15s';
+    if (headerCountdownMobile) headerCountdownMobile.textContent = '15s';
+
+    headerTimerInterval = setInterval(() => {
+      headerCountdownSeconds -= 1;
+      if (headerCountdownNum) headerCountdownNum.textContent = `${headerCountdownSeconds}s`;
+      if (headerCountdownMobile) headerCountdownMobile.textContent = `${headerCountdownSeconds}s`;
+
+      if (headerCountdownSeconds <= 0) {
+        collapseTopHeader();
+      }
+    }, 1000);
+  }
+
+  // Run the 15-second timer on page visit
+  startHeader15sTimer();
+
   // PWA beforeinstallprompt event
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
@@ -1001,85 +1070,7 @@ document.addEventListener('DOMContentLoaded', () => {
     deferredInstallPrompt = null;
     showToast('🎉 TaiMP4MP3 đã được cài đặt vào thiết bị của bạn!');
     if (headerInstallText) headerInstallText.textContent = 'Đã Cài Đặt';
-    dismissCallout();
   });
-
-  // --- 15-Second Installation Callout Pointer ---
-  const installCallout = document.getElementById('install-callout-toast');
-  const btnCloseCallout = document.getElementById('btn-close-callout');
-  const btnCalloutInstall = document.getElementById('btn-callout-install');
-  const installCountdownBadge = document.getElementById('install-countdown-badge');
-  const installTimerProgress = document.getElementById('install-timer-progress');
-
-  let calloutTimer = null;
-  let remainingSeconds = 15;
-
-  function dismissCallout() {
-    if (calloutTimer) {
-      clearInterval(calloutTimer);
-      calloutTimer = null;
-    }
-    if (installCallout) {
-      installCallout.classList.add('opacity-0', '-translate-y-4');
-      setTimeout(() => {
-        installCallout.classList.add('hidden');
-      }, 500);
-    }
-  }
-
-  function startCalloutCountdown() {
-    if (!installCallout || isStandalone) return;
-    if (sessionStorage.getItem('dismiss_install_callout')) return;
-
-    setTimeout(() => {
-      if (isStandalone) return;
-      installCallout.classList.remove('hidden');
-      void installCallout.offsetWidth;
-      installCallout.classList.remove('opacity-0', '-translate-y-4');
-      if (window.lucide) window.lucide.createIcons();
-
-      remainingSeconds = 15;
-      if (installCountdownBadge) installCountdownBadge.textContent = '15s';
-      if (installTimerProgress) installTimerProgress.style.width = '100%';
-
-      calloutTimer = setInterval(() => {
-        remainingSeconds -= 1;
-        if (installCountdownBadge) {
-          installCountdownBadge.textContent = `${remainingSeconds}s`;
-        }
-        if (installTimerProgress) {
-          const pct = Math.max(0, (remainingSeconds / 15) * 100);
-          installTimerProgress.style.width = `${pct}%`;
-        }
-
-        if (remainingSeconds <= 0) {
-          dismissCallout();
-        }
-      }, 1000);
-    }, 1000);
-  }
-
-  if (btnCloseCallout) {
-    btnCloseCallout.addEventListener('click', () => {
-      sessionStorage.setItem('dismiss_install_callout', 'true');
-      dismissCallout();
-    });
-  }
-
-  if (btnCalloutInstall) {
-    btnCalloutInstall.addEventListener('click', () => {
-      dismissCallout();
-      if (deferredInstallPrompt) {
-        triggerBrowserInstall();
-      } else {
-        openInstallModal();
-      }
-    });
-  }
-
-  if (!isStandalone) {
-    startCalloutCountdown();
-  }
 
   if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('/sw.js').catch((err) => {
