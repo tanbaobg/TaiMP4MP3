@@ -176,7 +176,7 @@ def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInf
             is_photo_mode = bool(images) or ("/photo/" in url.lower()) or ("audio_mp4" in play_url)
 
             if is_photo_mode and images:
-                # 1. Video MP4 Slideshow (Ghép ảnh và nhạc nền gốc có cả hình và tiếng)
+                # 1. Video MP4 (Ghép ảnh và nhạc nền gốc có cả hình và tiếng)
                 first_img = images[0]
                 audio_src = music_url or play_url
                 slideshow_proxy = (
@@ -187,8 +187,8 @@ def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInf
                 )
                 formats.append(
                     FormatOption(
-                        id="tiktok-slideshow",
-                        quality="MP4 Video Slideshow (Có đủ hình ảnh & tiếng)",
+                        id="tiktok-video",
+                        quality="MP4 Video (Có cả hình & tiếng)",
                         type="video",
                         ext="mp4",
                         filesize_str="Chuẩn H.264 HD",
@@ -200,23 +200,8 @@ def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInf
                     )
                 )
 
-                # 2. Toàn bộ các ảnh JPG chất lượng cao
-                for idx, img_link in enumerate(images):
-                    formats.append(
-                        FormatOption(
-                            id=f"tiktok-img-{idx+1}",
-                            quality=f"Ảnh {idx+1}/{len(images)} (Độ nét gốc JPG)",
-                            type="image",
-                            ext="jpg",
-                            filesize_str="HD Gốc",
-                            direct_url=img_link,
-                            proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(img_link)}&title={urllib.parse.quote(safe_title)}_anh{idx+1}&ext=jpg",
-                            has_audio=False,
-                        )
-                    )
-
             elif play_url and not ("audio_mp4" in play_url):
-                # Video MP4 bình thường
+                # Video MP4 bình thường không logo
                 formats.append(
                     FormatOption(
                         id="tiktok-nowm",
@@ -230,21 +215,21 @@ def extract_tiktok_direct(url: str, base_api_url: str = "") -> Optional[MediaInf
                         watermark=False,
                     )
                 )
-
-                if wmplay_url and wmplay_url != play_url:
-                    formats.append(
-                        FormatOption(
-                            id="tiktok-h264",
-                            quality="MP4 Chuẩn H.264 (Tương thích 100% mọi máy)",
-                            type="video",
-                            ext="mp4",
-                            filesize_str=format_filesize(d.get("wm_size")) or "Chuẩn H.264 Nét",
-                            direct_url=wmplay_url,
-                            proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(wmplay_url)}&title={urllib.parse.quote(safe_title)}&ext=mp4",
-                            has_audio=True,
-                            watermark=True,
-                        )
+            elif wmplay_url:
+                # Dự phòng nếu bản không logo không có sẵn
+                formats.append(
+                    FormatOption(
+                        id="tiktok-nowm",
+                        quality="MP4 Video (Có hình & tiếng)",
+                        type="video",
+                        ext="mp4",
+                        filesize_str=format_filesize(d.get("wm_size")) or "Chuẩn H.264 Nét",
+                        direct_url=wmplay_url,
+                        proxy_url=f"{base_api_url}/api/download?url={urllib.parse.quote(wmplay_url)}&title={urllib.parse.quote(safe_title)}&ext=mp4",
+                        has_audio=True,
+                        watermark=True,
                     )
+                )
 
             # Âm thanh gốc MP3
             audio_track = music_url or (play_url if "audio_mp4" in play_url else "")

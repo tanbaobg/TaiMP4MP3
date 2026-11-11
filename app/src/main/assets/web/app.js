@@ -553,26 +553,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Render Result Card ---
   function renderResult(data) {
     resThumbnail.src = data.thumbnail || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=60';
-    resDuration.textContent = data.duration_str || (data.images && data.images.length > 0 ? `${data.images.length} Ảnh` : 'Video');
+    resDuration.textContent = data.duration_str || 'Video';
     resTitle.textContent = data.title;
     resAuthor.querySelector('span').textContent = data.author || 'Tác giả';
 
     const platform = detectPlatform(data.url) || { name: data.platform.toUpperCase(), color: 'blue' };
     resPlatformBadge.textContent = platform.name;
 
-    const hasImages = Array.isArray(data.images) && data.images.length > 0;
-    if (hasImages) {
-      if (playerSectionTitle) playerSectionTitle.textContent = `Bộ Sưu Tập ${data.images.length} Ảnh TikTok & Nhạc Nền`;
-      if (inlinePhotoGallery) {
-        inlinePhotoGallery.classList.remove('hidden');
-        showPhoto(0);
-      }
-      if (tabFilterImages) tabFilterImages.classList.remove('hidden');
-    } else {
-      if (playerSectionTitle) playerSectionTitle.textContent = 'Cửa Sổ Xem Trước Video MP4';
-      if (inlinePhotoGallery) inlinePhotoGallery.classList.add('hidden');
-      if (tabFilterImages) tabFilterImages.classList.add('hidden');
-    }
+    if (playerSectionTitle) playerSectionTitle.textContent = 'Cửa Sổ Xem Trước Video MP4';
+    if (inlinePhotoGallery) inlinePhotoGallery.classList.add('hidden');
+    if (tabFilterImages) tabFilterImages.classList.add('hidden');
 
     const firstVideoFormat = data.formats.find((f) => f.type === 'video' && (f.direct_url || f.proxy_url));
     const firstAudioFormat = data.formats.find((f) => f.type === 'audio' && (f.direct_url || f.proxy_url));
@@ -584,6 +574,9 @@ document.addEventListener('DOMContentLoaded', () => {
       let streamUrl = `${currentApiBase.replace(/\/$/, '')}/api/stream?url=${encodeURIComponent(currentDirectStreamUrl)}`;
       if (streamTarget.audio_url) {
         streamUrl += `&audio_url=${encodeURIComponent(streamTarget.audio_url)}`;
+      }
+      if (streamTarget.id === 'tiktok-video' || (streamTarget.direct_url && streamTarget.direct_url.includes('is_slideshow=1'))) {
+        streamUrl += `&is_slideshow=1`;
       }
       inlineVideoPlayer.src = streamUrl;
       inlineVideoPlayer.load();

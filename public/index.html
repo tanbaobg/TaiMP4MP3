@@ -339,23 +339,6 @@
           </div>
           <div class="relative w-full aspect-video rounded-xl overflow-hidden bg-black border border-slate-800 shadow-xl">
             <video id="inline-video-player" controls preload="metadata" playsinline referrerpolicy="no-referrer" class="w-full h-full object-contain"></video>
-            <!-- Photo Gallery Overlay (cho dạng Album Ảnh TikTok) -->
-            <div id="inline-photo-gallery" class="hidden absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-2">
-              <img id="photo-gallery-img" src="" alt="TikTok Photo" class="max-h-[82%] max-w-full object-contain rounded-lg shadow-md" referrerpolicy="no-referrer">
-              <div class="absolute bottom-2.5 left-0 right-0 flex items-center justify-center gap-2.5 z-10">
-                <button type="button" id="btn-photo-prev" class="px-2.5 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-white border border-slate-700/80 shadow-md text-xs font-bold flex items-center gap-1 active:scale-95 transition-all">
-                  <i data-lucide="chevron-left" class="w-4 h-4"></i>
-                  <span>Trước</span>
-                </button>
-                <span id="photo-counter" class="px-3 py-1 rounded-lg bg-slate-900/90 text-xs font-mono font-bold text-emerald-400 border border-slate-700/80 shadow-inner">
-                  1 / 1
-                </span>
-                <button type="button" id="btn-photo-next" class="px-2.5 py-1.5 rounded-lg bg-slate-900/90 hover:bg-slate-800 text-white border border-slate-700/80 shadow-md text-xs font-bold flex items-center gap-1 active:scale-95 transition-all">
-                  <span>Sau</span>
-                  <i data-lucide="chevron-right" class="w-4 h-4"></i>
-                </button>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -453,9 +436,6 @@
             </button>
             <button data-filter="audio" class="format-tab px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 hover:text-white">
               🎵 Âm thanh MP3
-            </button>
-            <button data-filter="image" id="tab-filter-images" class="hidden format-tab px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 hover:text-white">
-              📸 Album Ảnh
             </button>
           </div>
 
@@ -875,6 +855,6 @@
   </footer>
 
   <!-- App Logic -->
-  <script src="/app.js?v=3.5"></script>
+  <script src="/app.js?v=3.6"></script>
 </body>
 </html>

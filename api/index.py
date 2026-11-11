@@ -360,9 +360,52 @@ async def stream_proxy(
     request: Request,
     url: str = Query(..., description="Đường dẫn file media trực tiếp để phát trong player"),
     audio_url: Optional[str] = Query(None, description="Đường dẫn âm thanh nếu cần ghép phát"),
+    is_slideshow: Optional[int] = Query(0, description="1 nếu là slideshow từ ảnh và nhạc"),
 ):
     """Proxy media trực tiếp vào thẻ <video> của trình duyệt với Range Header và hỗ trợ ghép audio on-the-fly."""
     decoded_url = urllib.parse.unquote(url)
+
+    if is_slideshow and audio_url:
+        decoded_audio = urllib.parse.unquote(audio_url)
+        ffmpeg_bin = get_ffmpeg_path()
+        cmd = [
+            ffmpeg_bin, "-y",
+            "-headers", "User-Agent: Mozilla/5.0\r\nReferer: https://www.tiktok.com/\r\n",
+            "-loop", "1", "-i", decoded_url,
+            "-headers", "User-Agent: Mozilla/5.0\r\nReferer: https://www.tiktok.com/\r\n",
+            "-i", decoded_audio,
+            "-c:v", "libx264", "-preset", "ultrafast", "-tune", "stillimage",
+            "-c:a", "copy",
+            "-pix_fmt", "yuv420p",
+            "-shortest",
+            "-movflags", "frag_keyframe+empty_moov",
+            "-f", "mp4",
+            "pipe:1"
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        async def slideshow_stream_gen():
+            try:
+                while True:
+                    chunk = await proc.stdout.read(64 * 1024)
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                if proc.returncode is None:
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
+
+        return StreamingResponse(
+            slideshow_stream_gen(),
+            media_type="video/mp4",
+            headers={"Accept-Ranges": "bytes", "Content-Type": "video/mp4"}
+        )
 
     if audio_url:
         decoded_audio = urllib.parse.unquote(audio_url)
