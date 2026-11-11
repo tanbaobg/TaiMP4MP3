@@ -20,7 +20,7 @@ except ImportError:
 app = FastAPI(
     title="TaiMP4MP3 Serverless",
     description="Web, API & Multi-Segment Video Trimmer Serverless chạy trên Vercel",
-    version="1.2.0",
+    version="1.3.0",
 )
 
 app.add_middleware(
@@ -130,7 +130,7 @@ def api_status():
         "app": "TaiMP4MP3 Serverless API",
         "platform": "Vercel",
         "status": "online",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "features": ["video_download", "audio_extract", "multi_segment_trim", "keep_remove_modes"],
         "yt_dlp": yt_dlp.version.__version__,
     }
@@ -140,7 +140,7 @@ def api_status():
 def health_check():
     return {
         "status": "healthy",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "yt_dlp": yt_dlp.version.__version__,
     }
 
