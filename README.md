@@ -120,19 +120,25 @@ File APK hoàn thiện sẽ nằm tại: `app/build/outputs/apk/release/app-rele
 
 ---
 
-## ☁️ Triển Khai Lên Máy Chủ Cloud Miễn Phí
+## ☁️ Triển Khai Lên Vercel & Cloud Miễn Phí
 
-### Triển khai Backend API:
-- **Render.com:** Kết nối kho GitHub này với Render, chọn **Web Service**, chọn thư mục gốc hoặc dùng tệp `backend/render.yaml` đi kèm.
-- **Railway.app:** Tạo Project mới từ GitHub Repo, chọn `backend/Dockerfile`.
-- **VPS / Docker:**
+### ⚡ 1. Chạy hoàn toàn trên Vercel (Khuyên dùng)
+Dự án đã được cấu hình sẵn **Vercel Serverless Functions (Python)** tại thư mục `/api` và giao diện Web tại `/web`:
+1. Truy cập [Vercel Dashboard](https://vercel.com/new).
+2. Chọn **Import** kho lưu trữ: `https://github.com/tanbaobg/TaiMP4MP3`.
+3. Bấm **Deploy** (không cần cấu hình thêm gì).
+4. Vercel sẽ tự động:
+   - Triển khai giao diện Web tốc độ cao (PWA) với liên kết tải APK trực tiếp.
+   - Kích hoạt Python Serverless Function tại `/api/analyze` và `/api/download` để bóc tách video.
+
+### 🌐 2. Triển khai Backend riêng trên Render / Railway / VPS:
+- **Render.com:** Kết nối repo, chọn file cấu hình `backend/render.yaml`.
+- **Railway.app:** Tạo Project mới, chọn `backend/Dockerfile`.
+- **Docker / VPS:**
   ```bash
   docker build -t taimp4mp3-api backend/
   docker run -d -p 8000:8000 --name taimp4mp3 taimp4mp3-api
   ```
-
-### Triển khai Frontend Web:
-- **Vercel / Netlify / Cloudflare Pages:** Kết nối kho GitHub, thư mục gốc sẽ tự động nhận diện file `vercel.json` và triển khai web tĩnh trong vài giây.
 
 ---
 

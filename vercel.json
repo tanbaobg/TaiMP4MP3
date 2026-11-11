@@ -1,8 +1,25 @@
 {
   "version": 2,
-  "public": true,
   "cleanUrls": true,
+  "headers": [
+    {
+      "source": "/(.*\\.apk)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/vnd.android.package-archive"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "attachment; filename=\"taimp4mp3-latest.apk\""
+        }
+      ]
+    }
+  ],
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.py" },
+    { "source": "/taimp4mp3-latest.apk", "destination": "/web/taimp4mp3-latest.apk" },
+    { "source": "/taimp4mp3.apk", "destination": "/web/taimp4mp3.apk" },
     { "source": "/(.*)", "destination": "/web/$1" }
   ]
 }
