@@ -224,16 +224,19 @@ def extract_info(url: str, base_api_url: str = "") -> MediaInfo:
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             info = ydl.extract_info(url, download=False)
-        except Exception:
+        except Exception as first_err:
             if platform == "youtube":
                 ydl_opts["extractor_args"] = {
                     "youtube": {
-                        "player_client": ["ios", "android"],
-                        "player_skip": ["webpage", "configs"],
+                        "player_client": ["android", "tv_embedded"],
+                        "player_skip": ["configs"],
                     }
                 }
-            with yt_dlp.YoutubeDL(ydl_opts) as fallback_ydl:
-                info = fallback_ydl.extract_info(url, download=False)
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as fallback_ydl:
+                    info = fallback_ydl.extract_info(url, download=False)
+            except Exception as second_err:
+                raise Exception(f"Lỗi 1: {first_err} | Lỗi 2: {second_err}")
 
     title = info.get("title") or info.get("description") or "Video không tiêu đề"
     safe_title = clean_title(title)

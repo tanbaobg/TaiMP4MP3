@@ -161,13 +161,7 @@ async def analyze_url(req: AnalyzeRequest, request: Request):
         return media_info
     except Exception as e:
         error_msg = str(e)
-        if "Unsupported URL" in error_msg:
-            detail = "Đường dẫn không được hỗ trợ hoặc không tồn tại."
-        elif "Private video" in error_msg or "Sign in" in error_msg:
-            detail = "Video này đang ở chế độ riêng tư hoặc yêu cầu đăng nhập."
-        else:
-            detail = f"Không thể lấy thông tin video: {error_msg}"
-        raise HTTPException(status_code=400, detail=detail)
+        raise HTTPException(status_code=400, detail=f"Lỗi: {error_msg}")
 
 @app.get("/download")
 @app.get("/api/download")
